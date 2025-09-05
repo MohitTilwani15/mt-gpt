@@ -77,22 +77,21 @@ export class MessageQueryService {
 
   async voteMessage({ chatId, messageId, type }: { chatId: string, messageId: string, type: 'up' | 'down' }) {
     try {
-      const [existingVote] = await this.db
-        .select()
-        .from(vote)
-        .where(and(eq(vote.messageId, messageId)));
-  
-      if (existingVote) {
-        return await this.db
-          .update(vote)
-          .set({ isUpvoted: type === 'up' })
-          .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
-      }
-      return await this.db.insert(vote).values({
-        chatId,
-        messageId,
-        isUpvoted: type === 'up',
-      });
+      const isUpvoted = type === 'up';
+      
+      await this.db
+        .insert(vote)
+        .values({
+          chatId,
+          messageId,
+          isUpvoted,
+        })
+        .onConflictDoUpdate({
+          target: [vote.chatId, vote.messageId],
+          set: {
+            isUpvoted,
+          },
+        });
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to vote message');
     }

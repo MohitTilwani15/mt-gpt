@@ -1,0 +1,223 @@
+import { 
+  Controller, 
+  Get, 
+  Post, 
+  Patch,
+  Delete, 
+  Query, 
+  Body, 
+  Param, 
+  Res, 
+  UseGuards,
+  HttpStatus,
+} from '@nestjs/common';
+import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
+import { Response } from 'express';
+
+import { ChatService } from './chat.service';
+import { PostChatRequestDto, GetChatsQueryDto, DeleteChatQueryDto, GetVotesQueryDto, VoteMessageDto } from './dto/chat.dto';
+import { ChatSDKError } from 'src/lib/errors';
+
+@Controller('chat')
+@UseGuards(AuthGuard)
+export class ChatController {
+  constructor(
+    private readonly chatService: ChatService,
+  ) {}
+
+  @Post()
+  async createChat(
+    @Body() body: PostChatRequestDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.chatService.createChat(body, session)
+      return result(res);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      console.error('Unhandled error in chat API:', error);
+      return res.status(500).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Get()
+  async getChats(@Query() query: GetChatsQueryDto, @Session() session: UserSession, @Res() res: Response) {
+    try {
+      const limit = Number.parseInt(query.limit || '10');
+      const startingAfter = query.startingAfter;
+      const endingBefore = query.endingBefore;
+
+      if (startingAfter && endingBefore) {
+        throw new ChatSDKError(
+          'bad_request:api',
+          'Only one of starting_after or ending_before can be provided.',
+        );
+      }
+
+      const chats = await this.chatService.getChats(session.user.id, {
+        limit,
+        startingAfter,
+        endingBefore,
+      });
+
+      return res.json(chats);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Get(':id')
+  async getChatById(@Param('id') id: string, @Session() session: UserSession, @Res() res: Response) {
+    try {
+      const result = await this.chatService.getChatById(id, session);
+      return result;
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(500).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Get(':id/stream')
+  async getChatStream(@Param('id') id: string, @Session() session: UserSession, @Res() res: Response) {
+    try {
+      const result = await this.chatService.getChatStream(id, session);
+      return result;
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(500).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Delete()
+  async deleteChat(@Query() query: DeleteChatQueryDto, @Session() session: UserSession, @Res() res: Response) {
+    try {
+      const result = await this.chatService.deleteChat(query.id, session);
+      return result;
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Get('votes')
+  async getVotes(@Query() query: GetVotesQueryDto, @Session() session: UserSession, @Res() res: Response) {
+    try {
+      if (!query.chatId) {
+        throw new ChatSDKError(
+          'bad_request:api',
+          'Parameter chatId is required.',
+        );
+      }
+
+      const votes = await this.chatService.getVotesByChatId(query.chatId, session);
+      return res.json(votes);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Patch('vote')
+  async voteMessage(
+    @Body() body: VoteMessageDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      if (!body.chatId || !body.messageId || !body.type) {
+        throw new ChatSDKError(
+          'bad_request:api',
+          'Parameters chatId, messageId, and type are required.',
+        );
+      }
+
+      await this.chatService.voteMessage(body.chatId, body.messageId, body.type, session);
+      return res.status(HttpStatus.OK).send('Message voted');
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  private getHttpStatus(errorCode: string): number {
+    const statusMap: Record<string, number> = {
+      'bad_request:api': HttpStatus.BAD_REQUEST,
+      'unauthorized:chat': HttpStatus.UNAUTHORIZED,
+      'unauthorized:vote': HttpStatus.UNAUTHORIZED,
+      'forbidden:chat': HttpStatus.FORBIDDEN,
+      'forbidden:vote': HttpStatus.FORBIDDEN,
+      'not_found:chat': HttpStatus.NOT_FOUND,
+      'not_found:vote': HttpStatus.NOT_FOUND,
+      'not_found:stream': HttpStatus.NOT_FOUND,
+      'rate_limit:chat': HttpStatus.TOO_MANY_REQUESTS,
+      'offline:chat': HttpStatus.INTERNAL_SERVER_ERROR,
+    };
+    
+    return statusMap[errorCode] || HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+}

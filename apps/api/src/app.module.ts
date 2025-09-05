@@ -6,10 +6,14 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { DatabaseModule } from './database/database.module';
 import { DATABASE_CONNECTION } from './database/database-connection';
+import { ChatModule } from './chat/chat.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    DatabaseModule,
+    ChatModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, ConfigModule],
       useFactory: (database: NodePgDatabase, configService: ConfigService) => ({
@@ -33,7 +37,7 @@ import { DATABASE_CONNECTION } from './database/database-connection';
       inject: [DATABASE_CONNECTION, ConfigService],
     }),
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [],
 })
 export class AppModule {}
