@@ -4,12 +4,20 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   const protectedRoutes = ['/'];
+  const authRoutes = ['/login'];
+  
+  const sessionCookie = request.cookies.get('better-auth.session_token');
+  const isLoggedIn = !!sessionCookie;
   
   if (protectedRoutes.some(route => pathname.startsWith(route))) {
-    const sessionCookie = request.cookies.get('better-auth.session_token');
-    
-    if (!sessionCookie) {
+    if (!isLoggedIn) {
       return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+  
+  if (authRoutes.some(route => pathname.startsWith(route))) {
+    if (isLoggedIn) {
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
   
@@ -17,5 +25,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/']
+  matcher: ['/', '/login']
 };
