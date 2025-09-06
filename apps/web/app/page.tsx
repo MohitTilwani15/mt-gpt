@@ -1,5 +1,9 @@
 'use client';
 
+import { v4 as uuidv4 } from 'uuid';
+import { MicIcon, PaperclipIcon, UserIcon, BotIcon } from 'lucide-react';
+import { FormEventHandler, useState, useRef, useEffect } from "react";
+
 import {
   PromptInput,
   PromptInputButton,
@@ -15,8 +19,6 @@ import {
 } from '@workspace/ui/components/ui/shadcn-io/ai/prompt-input';
 import { Message, MessageContent, MessageAvatar } from '@workspace/ui/components/ui/shadcn-io/ai/message';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
-import { MicIcon, PaperclipIcon, UserIcon, BotIcon } from 'lucide-react';
-import { FormEventHandler, useState, useRef, useEffect } from "react";
 
 interface Message {
   id: string;
@@ -29,7 +31,7 @@ const models = [
   { id: 'gpt-4o', name: 'GPT-4o' },
   { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-];
+] as const;
 
 export default function Page() {
   const [text, setText] = useState<string>('');
@@ -55,8 +57,9 @@ export default function Page() {
       return;
     }
 
+    const chatId = uuidv4();
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       role: 'user',
       content: text,
       timestamp: new Date(),
@@ -67,14 +70,20 @@ export default function Page() {
     setIsStreaming(true);
 
     try {
-      const response = await fetch('/api/text-stream-example', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: text,
-          model: model,
+          id: chatId,
+          message: {
+            id: userMessage.id,
+            role: 'user',
+            parts: [{ type: 'text', text: text }],
+            attachments: [],
+          },
+          selectedChatModel: model,
         }),
       });
 
@@ -88,7 +97,7 @@ export default function Page() {
       }
 
       let assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: uuidv4(),
         role: 'assistant',
         content: '',
         timestamp: new Date(),
@@ -105,7 +114,6 @@ export default function Page() {
 
         buffer += decoder.decode(value, { stream: true });
         
-        // Update the assistant message content
         setMessages(prev => prev.map(msg => 
           msg.id === assistantMessage.id 
             ? { ...msg, content: buffer }
@@ -122,9 +130,8 @@ export default function Page() {
       setStatus('error');
       setIsStreaming(false);
       
-      // Add error message
       const errorMessage: Message = {
-        id: Date.now().toString(),
+        id: uuidv4(),
         role: 'assistant',
         content: 'Sorry, there was an error processing your request. Please try again.',
         timestamp: new Date(),
