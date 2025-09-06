@@ -3,15 +3,16 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, gt, lt, SQL } from 'drizzle-orm';
 
 import { ChatSDKError } from "../../lib/errors";
-import { Chat, chat, message, vote } from "../schemas/conversation.schema";
-import { stream } from '../schemas/stream.schema';
+import { Chat, chat, vote } from "../schemas/conversation.schema";
 import { DATABASE_CONNECTION } from '../database-connection';
+import { databaseSchema } from '../schemas';
+import { PostgresTransaction } from '../postgres-transaction';
 
 @Injectable()
 export class ChatQueryService {
   constructor(
     @Inject(DATABASE_CONNECTION)
-    private readonly db: NodePgDatabase,
+    private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
   async saveChat({
@@ -36,19 +37,31 @@ export class ChatQueryService {
   }
 
   async deleteChatById({ id }: { id: string }) {
-    try {
-      await this.db.delete(vote).where(eq(vote.chatId, id));
-      await this.db.delete(message).where(eq(message.chatId, id));
-      await this.db.delete(stream).where(eq(stream.chatId, id));
+    return this.db.transaction(async (transaction) => {
+      await transaction.delete(databaseSchema.vote).where(eq(databaseSchema.vote.chatId, id));
+      await transaction.delete(databaseSchema.message).where(eq(databaseSchema.message.chatId, id));
+      await transaction.delete(databaseSchema.stream).where(eq(databaseSchema.stream.chatId, id));
 
-      const [chatsDeleted] = await this.db
-        .delete(chat)
-        .where(eq(chat.id, id))
+      const [chatsDeleted] = await transaction
+        .delete(databaseSchema.chat)
+        .where(eq(databaseSchema.chat.id, id))
         .returning();
+      
       return chatsDeleted;
-    } catch (error) {
-      throw new ChatSDKError('bad_request:database', 'Failed to delete chat');
-    }
+    });
+  }
+
+  async deleteChatByIdWithTransaction({ id }: { id: string }, transaction: PostgresTransaction) {
+    await transaction.delete(databaseSchema.vote).where(eq(databaseSchema.vote.chatId, id));
+    await transaction.delete(databaseSchema.message).where(eq(databaseSchema.message.chatId, id));
+    await transaction.delete(databaseSchema.stream).where(eq(databaseSchema.stream.chatId, id));
+
+    const [chatsDeleted] = await transaction
+      .delete(databaseSchema.chat)
+      .where(eq(databaseSchema.chat.id, id))
+      .returning();
+    
+    return chatsDeleted;
   }
 
   async getChatsByUserId({

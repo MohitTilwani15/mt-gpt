@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { UserSession } from '@mguay/nestjs-better-auth';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { eq, asc } from 'drizzle-orm';
 
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
@@ -9,6 +11,8 @@ import { StreamQueryService } from 'src/database/queries/stream.query';
 import { ChatSDKError } from 'src/lib/errors';
 import { PostChatRequestDto, GetChatsQueryDto, ChatModel } from './dto/chat.dto';
 import { ChatResponse } from './interfaces/chat.interface';
+import { DATABASE_CONNECTION } from 'src/database/database-connection';
+import { databaseSchema } from 'src/database/schemas';
 
 @Injectable()
 export class ChatService {
@@ -16,49 +20,57 @@ export class ChatService {
     private readonly chatQueryService: ChatQueryService,
     private readonly messageQueryService: MessageQueryService,
     private readonly streamQueryService: StreamQueryService,
+    @Inject(DATABASE_CONNECTION) private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
     const { id, message, selectedChatModel } = requestBody;
-
+    
     const existingChat = await this.chatQueryService.getChatById({ id });
-
-    if (!existingChat) {
-      const title = await this.generateTitleFromUserMessage(message);
-
-      await this.chatQueryService.saveChat({
-        id,
-        userId: session.user.id,
-        title,
-      });
-    } else {
-      if (existingChat.userId !== session.user.id) {
-        throw new ChatSDKError('forbidden:chat');
-      }
+    if (existingChat && existingChat.userId !== session.user.id) {
+      throw new ChatSDKError('forbidden:chat');
     }
 
-    const messagesFromDb = await this.messageQueryService.getMessagesByChatId({ chatId: id });
-    const uiMessages = [...this.convertToUIMessages(messagesFromDb), message];
-
-    await this.messageQueryService.saveMessages({
-      messages: [
-        {
-          chatId: id,
-          id: message.id,
-          role: 'user',
-          parts: message.parts,
-          attachments: [],
+    return this.db.transaction(async (transaction) => {
+      if (!existingChat) {
+        const title = await this.generateTitleFromUserMessage(message);
+        
+        await transaction.insert(databaseSchema.chat).values({
+          id,
           createdAt: new Date(),
-        },
-      ],
-    });
+          userId: session.user.id,
+          title,
+        });
+      }
 
-    const streamId = this.generateUUID();
-    await this.streamQueryService.createStreamId({ streamId, chatId: id });
+      await transaction.insert(databaseSchema.message).values({
+        chatId: id,
+        id: message.id,
+        role: 'user',
+        parts: message.parts,
+        attachments: [],
+        createdAt: new Date(),
+      });
 
-    return this.generateAIResponse({
-      messages: uiMessages,
-      selectedChatModel,
+      const streamId = this.generateUUID();
+      await transaction.insert(databaseSchema.stream).values({
+        id: streamId,
+        chatId: id,
+        createdAt: new Date(),
+      });
+
+      const messagesFromDb = await transaction
+        .select()
+        .from(databaseSchema.message)
+        .where(eq(databaseSchema.message.chatId, id))
+        .orderBy(asc(databaseSchema.message.createdAt));
+      
+      const uiMessages = [...this.convertToUIMessages(messagesFromDb), message];
+
+      return this.generateAIResponse({
+        messages: uiMessages,
+        selectedChatModel,
+      });
     });
   }
 

@@ -1,3 +1,11 @@
 {
-  "tailwindCSS.experimental.configFile": "packages/ui/src/styles/globals.css"
+  "tailwindCSS.experimental.configFile": "packages/ui/src/styles/globals.css",
+  "debug.allowBreakpointsEverywhere": true,
+  "debug.javascript.breakOnConditionalError": true,
+  "debug.terminal.clearBeforeReusing": true,
+  "debug.console.fontSize": 14,
+  "debug.console.lineHeight": 22,
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always"
 }

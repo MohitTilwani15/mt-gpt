@@ -3,14 +3,15 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq, asc, gte, count } from 'drizzle-orm';
 
 import { ChatSDKError } from "../../lib/errors";
-import { chat, DBMessage, message, vote } from "../schemas/conversation.schema";
+import { chat, DBMessage, message } from "../schemas/conversation.schema";
 import { DATABASE_CONNECTION } from '../database-connection';
+import { databaseSchema } from '../schemas';
 
 @Injectable()
 export class MessageQueryService {
   constructor(
     @Inject(DATABASE_CONNECTION)
-    private readonly db: NodePgDatabase,
+    private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
   async saveMessages({ messages }: { messages: DBMessage[] }) {
@@ -76,24 +77,22 @@ export class MessageQueryService {
   }
 
   async voteMessage({ chatId, messageId, type }: { chatId: string, messageId: string, type: 'up' | 'down' }) {
-    try {
+    return this.db.transaction(async (transaction) => {
       const isUpvoted = type === 'up';
       
-      await this.db
-        .insert(vote)
+      await transaction
+        .insert(databaseSchema.vote)
         .values({
           chatId,
           messageId,
           isUpvoted,
         })
         .onConflictDoUpdate({
-          target: [vote.chatId, vote.messageId],
+          target: [databaseSchema.vote.chatId, databaseSchema.vote.messageId],
           set: {
             isUpvoted,
           },
         });
-    } catch (error) {
-      throw new ChatSDKError('bad_request:database', 'Failed to vote message');
-    }
+    });
   }
 }
