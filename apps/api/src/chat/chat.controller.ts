@@ -15,7 +15,7 @@ import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
 import { Response } from 'express';
 
 import { ChatService } from './chat.service';
-import { PostChatRequestDto, GetChatsQueryDto, DeleteChatQueryDto, GetVotesQueryDto, VoteMessageDto } from './dto/chat.dto';
+import { PostChatRequestDto, GetChatsQueryDto, DeleteChatQueryDto, GetVotesQueryDto, VoteMessageDto, GetMessagesQueryDto } from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
 
 @Controller('chat')
@@ -189,6 +189,31 @@ export class ChatController {
 
       await this.chatService.voteMessage(body.chatId, body.messageId, body.type, session);
       return res.status(HttpStatus.OK).send({ success: true });
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  @Get(':id/messages')
+  async getMessagesByChatId(
+    @Param('id') chatId: string,
+    @Query() query: GetMessagesQueryDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const messages = await this.chatService.getMessagesByChatId(chatId, query, session);
+      return res.json(messages);
     } catch (error) {
       if (error instanceof ChatSDKError) {
         return res.status(this.getHttpStatus(error.type)).json({

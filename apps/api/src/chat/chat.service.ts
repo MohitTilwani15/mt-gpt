@@ -9,7 +9,7 @@ import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
 import { StreamQueryService } from 'src/database/queries/stream.query';
 import { ChatSDKError } from 'src/lib/errors';
-import { PostChatRequestDto, GetChatsQueryDto, ChatModel } from './dto/chat.dto';
+import { PostChatRequestDto, GetMessagesQueryDto, ChatModel } from './dto/chat.dto';
 import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
@@ -206,6 +206,40 @@ export class ChatService {
       chatId,
       messageId,
       type,
+    });
+  }
+
+  async getMessagesByChatId(
+    chatId: string,
+    query: GetMessagesQueryDto,
+    session: UserSession,
+  ) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId });
+    
+    if (!chat) {
+      throw new ChatSDKError('not_found:chat');
+    }
+
+    if (chat.userId !== session.user.id) {
+      throw new ChatSDKError('forbidden:chat');
+    }
+
+    const limit = Number.parseInt(query.limit || '20');
+    const startingAfter = query.startingAfter;
+    const endingBefore = query.endingBefore;
+
+    if (startingAfter && endingBefore) {
+      throw new ChatSDKError(
+        'bad_request:api',
+        'Only one of starting_after or ending_before can be provided.',
+      );
+    }
+
+    return this.messageQueryService.getMessagesByChatIdPaginated({
+      chatId,
+      limit,
+      startingAfter: startingAfter || null,
+      endingBefore: endingBefore || null,
     });
   }
 

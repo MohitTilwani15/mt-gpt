@@ -75,3 +75,17 @@ export class VoteMessageDto {
   @IsEnum(['up', 'down'])
   type: 'up' | 'down';
 }
+
+export class GetMessagesQueryDto {
+  @IsOptional()
+  @IsString()
+  limit?: string;
+
+  @IsOptional()
+  @IsString()
+  startingAfter?: string;
+
+  @IsOptional()
+  @IsString()
+  endingBefore?: string;
+}

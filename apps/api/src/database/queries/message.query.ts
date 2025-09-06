@@ -95,4 +95,64 @@ export class MessageQueryService {
         });
     });
   }
+
+  async getMessagesByChatIdPaginated({
+    chatId,
+    limit,
+    startingAfter,
+    endingBefore,
+  }: {
+    chatId: string;
+    limit: number;
+    startingAfter?: string | null;
+    endingBefore?: string | null;
+  }) {
+    try {
+      let whereCondition = eq(message.chatId, chatId);
+
+      if (startingAfter) {
+        const startingMessage = await this.db
+          .select({ createdAt: message.createdAt })
+          .from(message)
+          .where(eq(message.id, startingAfter))
+          .limit(1);
+        
+        if (startingMessage.length > 0) {
+          whereCondition = and(whereCondition, gte(message.createdAt, startingMessage[0].createdAt));
+        }
+      }
+
+      if (endingBefore) {
+        const endingMessage = await this.db
+          .select({ createdAt: message.createdAt })
+          .from(message)
+          .where(eq(message.id, endingBefore))
+          .limit(1);
+        
+        if (endingMessage.length > 0) {
+          whereCondition = and(whereCondition, gte(message.createdAt, endingMessage[0].createdAt));
+        }
+      }
+
+      const messages = await this.db
+        .select()
+        .from(message)
+        .where(whereCondition)
+        .orderBy(asc(message.createdAt))
+        .limit(limit + 1);
+
+      const hasMore = messages.length > limit;
+      if (hasMore) {
+        messages.pop();
+      }
+
+      return {
+        messages,
+        hasMore,
+        nextCursor: hasMore ? messages[messages.length - 1]?.id : null,
+      };
+    } catch (error) {
+      throw new ChatSDKError('bad_request:database', 'Failed to get paginated messages by chat id');
+    }
+  }
 }
