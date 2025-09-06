@@ -9,13 +9,13 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get('better-auth.session_token');
   const isLoggedIn = !!sessionCookie;
   
-  if (protectedRoutes.some(route => pathname.startsWith(route))) {
+  if (protectedRoutes.some(route => pathname === route)) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
   }
   
-  if (authRoutes.some(route => pathname.startsWith(route))) {
+  if (authRoutes.some(route => pathname === route)) {
     if (isLoggedIn) {
       return NextResponse.redirect(new URL('/', request.url));
     }

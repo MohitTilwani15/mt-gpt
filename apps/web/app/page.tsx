@@ -134,7 +134,7 @@ export default function Page() {
   };
 
   return (
-    <div className='flex flex-col h-screen'>
+    <div className='flex flex-col h-[calc(100vh-8rem)]'>
       <div className='flex-1 overflow-hidden'>
         <Conversation className="h-full">
           <ConversationContent>
