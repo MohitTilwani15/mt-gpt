@@ -144,7 +144,7 @@ export class ChatService {
       system: this.getSystemPrompt(selectedChatModel),
     });
 
-    return result.pipeUIMessageStreamToResponse;
+    return result;
   }
 
   private async generateTitleFromUserMessage(message: any): Promise<string> {

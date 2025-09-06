@@ -33,7 +33,7 @@ export class ChatController {
   ) {
     try {
       const result = await this.chatService.createChat(body, session)
-      return result(res);
+      return result.pipeUIMessageStreamToResponse(res);
     } catch (error) {
       if (error instanceof ChatSDKError) {
         return res.status(this.getHttpStatus(error.type)).json({
