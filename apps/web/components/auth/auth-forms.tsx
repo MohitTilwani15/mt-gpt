@@ -30,6 +30,7 @@ export function LoginForm() {
       await authClient.signIn.email({
         email,
         password,
+        callbackURL: '/'
       });
     } catch (error) {
       console.error("Login failed:", error);
@@ -42,7 +43,7 @@ export function LoginForm() {
     try {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: 'http://localhost:3001/dashboard'
+        callbackURL: '/'
       });
     } catch (error) {
       console.error("Google sign in failed:", error);
@@ -127,6 +128,7 @@ export function SignUpForm() {
         email,
         password,
         name,
+        callbackURL: '/'
       });
     } catch (error) {
       console.error("Sign up failed:", error);
@@ -140,7 +142,7 @@ export function SignUpForm() {
       await authClient.signIn.social({
         provider: 'google',
         requestSignUp: true,
-        callbackURL: 'http://localhost:3001/dashboard'
+        callbackURL: '/'
       });
     } catch (error) {
       console.error("Google sign up failed:", error);
