@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
 import { Response } from 'express';
+import { Readable } from 'stream';
+import { JsonToSseTransformStream } from 'ai';
 
 import { ChatService } from './chat.service';
 import { PostChatRequestDto, GetChatsQueryDto, DeleteChatQueryDto, GetVotesQueryDto, VoteMessageDto, GetMessagesQueryDto } from './dto/chat.dto';
@@ -33,7 +35,23 @@ export class ChatController {
   ) {
     try {
       const result = await this.chatService.createChat(body, session)
-      return result.pipeUIMessageStreamToResponse(res);
+      const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
+      const nodeReadable = Readable.fromWeb(webSseStream);
+
+      nodeReadable.on('error', (err) => {
+        try {
+          res.write(`event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`);
+        } finally {
+          res.end();
+        }
+      });
+
+      nodeReadable.on('end', () => {
+        res.end();
+      });
+
+      nodeReadable.pipe(res);
+      return;
     } catch (error) {
       if (error instanceof ChatSDKError) {
         return res.status(this.getHttpStatus(error.type)).json({

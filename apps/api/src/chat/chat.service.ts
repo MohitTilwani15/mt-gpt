@@ -1,5 +1,6 @@
+import { v4 as uuidv4 } from 'uuid';
 import { Injectable, Inject } from '@nestjs/common';
-import { streamText, generateText } from 'ai';
+import { streamText, generateText, createUIMessageStream, stepCountIs, smoothStream, JsonToSseTransformStream } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -68,6 +69,7 @@ export class ChatService {
       const uiMessages = [...this.convertToUIMessages(messagesFromDb), ...messages];
 
       return this.generateAIResponse({
+        chatId: id,
         messages: uiMessages,
         selectedChatModel,
       });
@@ -132,19 +134,51 @@ export class ChatService {
   }
 
   private async generateAIResponse({
+    chatId,
     messages,
     selectedChatModel,
   }: {
+    chatId: string;
     messages: any[];
     selectedChatModel: ChatModel;
   }) {
-    const result = streamText({
-      model: openai(selectedChatModel || 'gpt-4o'),
-      messages: this.convertToModelMessages(messages),
-      system: this.getSystemPrompt(selectedChatModel),
+    const stream = createUIMessageStream({
+      execute: ({ writer: dataStream }) => {
+        const result = streamText({
+          model: openai(selectedChatModel || 'gpt-4o'),
+          system: this.getSystemPrompt(selectedChatModel),
+          messages: this.convertToModelMessages(messages),
+          stopWhen: stepCountIs(5),
+          experimental_transform: smoothStream({ chunking: 'word' }),
+        });
+
+        result.consumeStream();
+
+        dataStream.merge(
+          result.toUIMessageStream({
+            sendReasoning: true,
+          }),
+        );
+      },
+      generateId: uuidv4,
+      onFinish: async ({ messages }) => {
+        await this.messageQueryService.saveMessages({
+          messages: messages.map((message) => ({
+            id: message.id,
+            role: message.role,
+            parts: message.parts,
+            createdAt: new Date(),
+            attachments: [],
+            chatId,
+          })),
+        });
+      },
+      onError: () => {
+        return 'Oops, an error occurred!';
+      },
     });
 
-    return result;
+    return stream;
   }
 
   private async generateTitleFromUserMessage(message: string) {
