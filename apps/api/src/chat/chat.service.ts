@@ -34,7 +34,7 @@ export class ChatService {
 
     return this.db.transaction(async (transaction) => {
       if (!existingChat) {
-        const title = await this.generateTitleFromUserMessage(messages[0].parts.map(part => part.text).join(' '));
+        const title = await this.generateTitleFromUserMessage(messages[messages.length - 1].parts.map(part => part.text).join(' '));
         
         await transaction.insert(databaseSchema.chat).values({
           id,
@@ -44,14 +44,22 @@ export class ChatService {
         });
       }
 
-      await transaction.insert(databaseSchema.message).values({
-        chatId: id,
-        id: messages[0].id,
-        role: 'user',
-        parts: messages[0].parts,
-        attachments: [],
-        createdAt: new Date(),
-      });
+      const existingMessage = await transaction
+        .select()
+        .from(databaseSchema.message)
+        .where(eq(databaseSchema.message.id, messages[messages.length - 1].id))
+        .limit(1);
+
+      if (!existingMessage.length) {
+        await transaction.insert(databaseSchema.message).values({
+          chatId: id,
+          id: messages[messages.length - 1].id,
+          role: 'user',
+          parts: messages[messages.length - 1].parts,
+          attachments: [],
+          createdAt: new Date(),
+        });
+      }
 
       const streamId = this.generateUUID();
       await transaction.insert(databaseSchema.stream).values({
@@ -124,13 +132,39 @@ export class ChatService {
       throw new ChatSDKError('forbidden:chat');
     }
 
-    const streamIds = await this.streamQueryService.getStreamIdsByChatId({ chatId });
+    const messages = await this.messageQueryService.getMessagesByChatId({ chatId });
     
-    if (!streamIds.length) {
+    if (!messages.length) {
       throw new ChatSDKError('not_found:stream');
     }
 
-    return streamIds;
+    const stream = createUIMessageStream({
+      execute: ({ writer: dataStream }) => {
+        messages.forEach((message) => {
+          dataStream.write({
+            type: 'data-message',
+            data: {
+              id: message.id,
+              role: message.role,
+              parts: message.parts,
+              attachments: message.attachments,
+            },
+          });
+        });
+        
+        dataStream.write({
+          type: 'finish',
+        });
+      },
+      generateId: uuidv4,
+      onFinish: async () => {
+      },
+      onError: () => {
+        return 'Oops, an error occurred!';
+      },
+    });
+
+    return stream;
   }
 
   private async generateAIResponse({

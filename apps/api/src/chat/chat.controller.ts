@@ -155,7 +155,23 @@ export class ChatController {
   async getChatStream(@Param('id') id: string, @Session() session: UserSession, @Res() res: Response) {
     try {
       const result = await this.chatService.getChatStream(id, session);
-      return res.json(result);
+      const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
+      const nodeReadable = Readable.fromWeb(webSseStream);
+
+      nodeReadable.on('error', (err) => {
+        try {
+          res.write(`event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`);
+        } finally {
+          res.end();
+        }
+      });
+
+      nodeReadable.on('end', () => {
+        res.end();
+      });
+
+      nodeReadable.pipe(res);
+      return;
     } catch (error) {
       if (error instanceof ChatSDKError) {
         return res.status(this.getHttpStatus(error.type)).json({
