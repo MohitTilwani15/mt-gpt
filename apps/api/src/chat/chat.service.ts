@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -24,7 +24,7 @@ export class ChatService {
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
-    const { id, message, selectedChatModel } = requestBody;
+    const { id, messages, selectedChatModel } = requestBody;
     
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
@@ -33,7 +33,7 @@ export class ChatService {
 
     return this.db.transaction(async (transaction) => {
       if (!existingChat) {
-        const title = await this.generateTitleFromUserMessage(message);
+        const title = await this.generateTitleFromUserMessage(messages[0].parts.map(part => part.text).join(' '));
         
         await transaction.insert(databaseSchema.chat).values({
           id,
@@ -45,9 +45,9 @@ export class ChatService {
 
       await transaction.insert(databaseSchema.message).values({
         chatId: id,
-        id: message.id,
+        id: messages[0].id,
         role: 'user',
-        parts: message.parts,
+        parts: messages[0].parts,
         attachments: [],
         createdAt: new Date(),
       });
@@ -65,7 +65,7 @@ export class ChatService {
         .where(eq(databaseSchema.message.chatId, id))
         .orderBy(asc(databaseSchema.message.createdAt));
       
-      const uiMessages = [...this.convertToUIMessages(messagesFromDb), message];
+      const uiMessages = [...this.convertToUIMessages(messagesFromDb), ...messages];
 
       return this.generateAIResponse({
         messages: uiMessages,
@@ -139,7 +139,7 @@ export class ChatService {
     selectedChatModel: ChatModel;
   }) {
     const result = streamText({
-      model: openai(selectedChatModel),
+      model: openai(selectedChatModel || 'gpt-4o'),
       messages: this.convertToModelMessages(messages),
       system: this.getSystemPrompt(selectedChatModel),
     });
@@ -147,9 +147,18 @@ export class ChatService {
     return result;
   }
 
-  private async generateTitleFromUserMessage(message: any): Promise<string> {
-    const firstPart = message.parts[0]?.text || 'New Chat';
-    return firstPart.substring(0, 50) + (firstPart.length > 50 ? '...' : '');
+  private async generateTitleFromUserMessage(message: string) {
+    const { text: title } = await generateText({
+      model: openai('gpt-4o'),
+      system: `\n
+      - you will generate a short title based on the first message a user begins a conversation with
+      - ensure it is not more than 80 characters long
+      - the title should be a summary of the user's message
+      - do not use quotes or colons`,
+      prompt: message,
+    });
+
+    return title;
   }
 
   private convertToUIMessages(messages: any[]): any[] {

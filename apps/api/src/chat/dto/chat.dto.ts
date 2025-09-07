@@ -35,7 +35,7 @@ export class PostChatRequestDto {
   id: string;
 
   @Type(() => ChatMessage)
-  message: ChatMessage;
+  messages: ChatMessage[];
 
   @IsEnum(ChatModel)
   selectedChatModel: ChatModel;

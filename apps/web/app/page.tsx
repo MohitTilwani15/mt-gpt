@@ -1,8 +1,10 @@
 'use client';
 
 import { v4 as uuidv4 } from 'uuid';
-import { MicIcon, PaperclipIcon, UserIcon, BotIcon } from 'lucide-react';
+import { MicIcon, PaperclipIcon, BotIcon } from 'lucide-react';
 import { FormEventHandler, useState, useRef, useEffect } from "react";
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 
 import {
   PromptInput,
@@ -17,7 +19,7 @@ import {
   PromptInputToolbar,
   PromptInputTools,
 } from '@workspace/ui/components/ui/shadcn-io/ai/prompt-input';
-import { Message, MessageContent, MessageAvatar } from '@workspace/ui/components/ui/shadcn-io/ai/message';
+import { Message, MessageContent } from '@workspace/ui/components/ui/shadcn-io/ai/message';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 
 interface Message {
@@ -34,13 +36,24 @@ const models = [
 ] as const;
 
 export default function Page() {
+  const { messages, sendMessage, status } = useChat({
+    generateId: () => uuidv4(),
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      prepareSendMessagesRequest({ messages, id, body }) {
+        return {
+          body: {
+            id,
+            messages,
+            selectedChatModel: model,
+            ...body,
+          }
+        };
+      },
+    })
+  });
   const [text, setText] = useState<string>('');
   const [model, setModel] = useState<string>(models[0]?.id || '');
-  const [status, setStatus] = useState<
-    'submitted' | 'streaming' | 'ready' | 'error'
-  >('ready');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -53,90 +66,9 @@ export default function Page() {
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
-    if (!text.trim()) {
-      return;
-    }
-
-    const chatId = uuidv4();
-    const userMessage: Message = {
-      id: uuidv4(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setStatus('submitted');
-    setIsStreaming(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: chatId,
-          message: {
-            id: userMessage.id,
-            role: 'user',
-            parts: [{ type: 'text', text: text }],
-            attachments: [],
-          },
-          selectedChatModel: model,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
-
-      let assistantMessage: Message = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        
-        setMessages(prev => prev.map(msg => 
-          msg.id === assistantMessage.id 
-            ? { ...msg, content: buffer }
-            : msg
-        ));
-      }
-
-      setStatus('ready');
-      setIsStreaming(false);
+    if (text.trim()) {
+      sendMessage({ text: text.trim() });
       setText('');
-
-    } catch (error) {
-      console.error('Error:', error);
-      setStatus('error');
-      setIsStreaming(false);
-      
-      const errorMessage: Message = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: 'Sorry, there was an error processing your request. Please try again.',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
     }
   };
 
@@ -156,19 +88,12 @@ export default function Page() {
             ) : (
               messages.map((message) => (
                 <Message key={message.id} from={message.role}>
-                  <MessageAvatar
-                    src={message.role === 'user' ? '' : ''}
-                    name={message.role === 'user' ? 'You' : 'AI'}
-                    className={message.role === 'user' ? 'bg-primary' : 'bg-secondary'}
-                  >
-                    {message.role === 'user' ? (
-                      <UserIcon className="h-4 w-4 text-primary-foreground" />
-                    ) : (
-                      <BotIcon className="h-4 w-4 text-secondary-foreground" />
-                    )}
-                  </MessageAvatar>
                   <MessageContent>
-                    <div className="whitespace-pre-wrap">{message.content}</div>
+                    <div className="whitespace-pre-wrap">
+                      {message.parts.map((part, index) =>
+                        part.type === 'text' ? <span key={index}>{part.text}</span> : null
+                      )}
+                    </div>
                   </MessageContent>
                 </Message>
               ))
@@ -185,18 +110,18 @@ export default function Page() {
             onChange={(e) => setText(e.target.value)}
             value={text}
             placeholder="Type your message..."
-            disabled={isStreaming}
+            disabled={status !== 'ready'}
           />
           <PromptInputToolbar>
             <PromptInputTools>
-              <PromptInputButton disabled={isStreaming}>
+              <PromptInputButton disabled={status !== 'ready'}>
                 <PaperclipIcon size={16} />
               </PromptInputButton>
-              <PromptInputButton disabled={isStreaming}>
+              <PromptInputButton disabled={status !== 'ready'}>
                 <MicIcon size={16} />
                 <span>Voice</span>
               </PromptInputButton>
-              <PromptInputModelSelect onValueChange={setModel} value={model} disabled={isStreaming}>
+              <PromptInputModelSelect onValueChange={setModel} value={model} disabled={status !== 'ready'}>
                 <PromptInputModelSelectTrigger>
                   <PromptInputModelSelectValue />
                 </PromptInputModelSelectTrigger>
@@ -209,7 +134,7 @@ export default function Page() {
                 </PromptInputModelSelectContent>
               </PromptInputModelSelect>
             </PromptInputTools>
-            <PromptInputSubmit disabled={!text.trim() || isStreaming} status={isStreaming ? 'streaming' : status} />
+            <PromptInputSubmit disabled={!text.trim() || status !== 'ready'} status={status} />
           </PromptInputToolbar>
         </PromptInput>
       </div>
