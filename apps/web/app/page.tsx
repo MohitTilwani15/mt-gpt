@@ -1,7 +1,7 @@
 'use client';
 
 import { v4 as uuidv4 } from 'uuid';
-import { MicIcon, PaperclipIcon, BotIcon, XIcon, FileIcon, DownloadIcon } from 'lucide-react';
+import { MicIcon, PaperclipIcon, BotIcon, XIcon, FileIcon, DownloadIcon, EyeIcon } from 'lucide-react';
 import { FormEventHandler, useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -23,6 +23,7 @@ import { Message, MessageContent } from '@workspace/ui/components/ui/shadcn-io/a
 import { Conversation, ConversationContent, ConversationScrollButton } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import { Button } from '@workspace/ui/components/button';
 import { Card, CardContent } from '@workspace/ui/components/card';
+import PDFPreviewModal from '../components/pdf-preview-modal';
 
 interface Message {
   id: string;
@@ -40,6 +41,16 @@ interface UploadedFile {
   file: File;
 }
 
+interface MessageDocument {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  text?: string;
+  downloadUrl: string;
+  createdAt: string;
+}
+
 const models = [
   { id: 'gpt-4o', name: 'GPT-4o' },
   { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
@@ -50,6 +61,9 @@ export default function Page() {
   const [chatId] = useState(() => uuidv4());
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [messageDocuments, setMessageDocuments] = useState<Record<string, MessageDocument[]>>({});
+  const [previewDocument, setPreviewDocument] = useState<MessageDocument | null>(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { messages, sendMessage, status } = useChat({
@@ -147,6 +161,42 @@ export default function Page() {
     fileInputRef.current?.click();
   };
 
+  const fetchMessageDocuments = useCallback(async (messageId: string) => {
+    try {
+      const response = await fetch(`/api/files/message/${messageId}`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMessageDocuments(prev => ({
+          ...prev,
+          [messageId]: data.documents,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching message documents:', error);
+    }
+  }, []);
+
+  const openDocumentPreview = (document: MessageDocument) => {
+    setPreviewDocument(document);
+    setIsPreviewModalOpen(true);
+  };
+
+  const closeDocumentPreview = () => {
+    setIsPreviewModalOpen(false);
+    setPreviewDocument(null);
+  };
+
+  useEffect(() => {
+    messages.forEach(message => {
+      if (!messageDocuments[message.id]) {
+        fetchMessageDocuments(message.id);
+      }
+    });
+  }, [messages, messageDocuments, fetchMessageDocuments]);
+
   const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
     if (text.trim() || uploadedFiles.length > 0) {
@@ -178,6 +228,44 @@ export default function Page() {
                         part.type === 'text' ? <span key={index}>{part.text}</span> : null
                       )}
                     </div>
+                    
+                    {(() => {
+                      const docs = messageDocuments[message.id] || [];
+                      return docs.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          <h4 className="text-xs font-medium text-muted-foreground">Attached Documents</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {docs.map((doc) => (
+                            <Card key={doc.id} className="flex items-center gap-2 p-2 max-w-xs">
+                              <CardContent className="flex items-center gap-2 p-0">
+                                <FileIcon className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{doc.fileName}</p>
+                                  <p className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openDocumentPreview(doc)}
+                                  >
+                                    <EyeIcon className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(doc.downloadUrl, '_blank')}
+                                  >
+                                    <DownloadIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
                   </MessageContent>
                 </Message>
               ))
@@ -275,6 +363,12 @@ export default function Page() {
           accept=".pdf,.doc,.docx,.txt,.csv"
         />
       </div>
+      
+      <PDFPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={closeDocumentPreview}
+        document={previewDocument}
+      />
     </div>
   )
 }

@@ -78,6 +78,15 @@ export class FileController {
     return { documents };
   }
 
+  @Get('message/:messageId/content/:documentId')
+  async getDocumentContent(
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    const document = await this.fileDocumentService.getDocumentContent(documentId);
+    return { document };
+  }
+
   @Get('chat/:chatId')
   async getDocumentsByChat(
     @Param('chatId', ParseUUIDPipe) chatId: string,

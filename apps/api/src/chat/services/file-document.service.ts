@@ -4,12 +4,12 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, desc, sql } from 'drizzle-orm';
 import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
+import { extractText, getDocumentProxy } from 'unpdf';
 
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { databaseSchema } from '../../database/schemas';
 
-const pdfParse = require('pdf-parse');
 
 export interface CreateFileDocumentParams {
   chatId: string;
@@ -33,7 +33,7 @@ export class FileDocumentService {
   ) {}
 
   async createFileDocument(params: CreateFileDocumentParams) {
-    const { chatId, messageId, file, extractText = false, userId } = params;
+    const { chatId, messageId, file, extractText: shouldExtractText = false, userId } = params;
 
     const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
       file,
@@ -43,10 +43,11 @@ export class FileDocumentService {
     let embedding = null;
 
     try {
-      if (extractText && file.mimetype === 'application/pdf') {
+      if (shouldExtractText && file.mimetype === 'application/pdf') {
         try {
-          const pdfData = await pdfParse(file.buffer);
-          textContent = pdfData.text;
+          const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
+          const { text } = await extractText(pdf, { mergePages: true });
+          textContent = text;
   
           if (textContent.trim()) {
             const { embedding: textEmbedding } = await embed({
@@ -127,14 +128,14 @@ export class FileDocumentService {
     extractText?: boolean;
     userId?: string;
   }) {
-    const { chatId, messageId, files, extractText = false, userId } = params;
+    const { chatId, messageId, files, extractText: shouldExtractText = false, userId } = params;
 
     const createPromises = files.map(file =>
       this.createFileDocument({
         chatId,
         messageId,
         file,
-        extractText,
+        extractText: shouldExtractText,
         userId,
       }),
     );
@@ -177,6 +178,31 @@ export class FileDocumentService {
       )
       .where(eq(databaseSchema.messageDocument.messageId, messageId))
       .orderBy(desc(databaseSchema.document.createdAt));
+  }
+
+  async getDocumentContent(documentId: string) {
+    const [document] = await this.db
+      .select()
+      .from(databaseSchema.document)
+      .where(eq(databaseSchema.document.id, documentId));
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const downloadUrl = await this.cloudflareR2Service.getDownloadUrl({
+      key: document.fileKey,
+    });
+
+    return {
+      id: document.id,
+      fileName: document.fileName,
+      fileSize: document.fileSize,
+      mimeType: document.mimeType,
+      text: document.text,
+      downloadUrl,
+      createdAt: document.createdAt,
+    };
   }
 
   async getDocumentsByChatId(chatId: string) {
