@@ -8,7 +8,7 @@ import { eq, asc } from 'drizzle-orm';
 
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
-import { StreamQueryService } from 'src/database/queries/stream.query';
+import { DocumentQueryService } from 'src/database/queries/document.query';
 import { ChatSDKError } from 'src/lib/errors';
 import { PostChatRequestDto, GetMessagesQueryDto, ChatModel } from './dto/chat.dto';
 import { ChatResponse } from './interfaces/chat.interface';
@@ -20,12 +20,12 @@ export class ChatService {
   constructor(
     private readonly chatQueryService: ChatQueryService,
     private readonly messageQueryService: MessageQueryService,
-    private readonly streamQueryService: StreamQueryService,
+    private readonly documentQueryService: DocumentQueryService,
     @Inject(DATABASE_CONNECTION) private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
-    const { id, messages, selectedChatModel } = requestBody;
+    const { id, messages, selectedChatModel, documentIds } = requestBody;
     
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
@@ -43,7 +43,7 @@ export class ChatService {
           title,
         });
       }
-
+      
       const existingMessage = await transaction
         .select()
         .from(databaseSchema.message)
@@ -51,14 +51,26 @@ export class ChatService {
         .limit(1);
 
       if (!existingMessage.length) {
-        await transaction.insert(databaseSchema.message).values({
+        const messageInsert = await transaction.insert(databaseSchema.message).values({
           chatId: id,
           id: messages[messages.length - 1].id,
           role: 'user',
           parts: messages[messages.length - 1].parts,
           attachments: [],
           createdAt: new Date(),
-        });
+        }).returning();
+
+        const insertedMessageId = messageInsert[0].id;
+
+        if (documentIds && documentIds.length > 0) {
+          const linkPromises = documentIds.map(documentId =>
+            transaction.insert(databaseSchema.messageDocument).values({
+              messageId: insertedMessageId,
+              documentId,
+            })
+          );
+          await Promise.all(linkPromises);
+        }
       }
 
       const streamId = this.generateUUID();
@@ -177,10 +189,35 @@ export class ChatService {
     selectedChatModel: ChatModel;
   }) {
     const stream = createUIMessageStream({
-      execute: ({ writer: dataStream }) => {
+      execute: async ({ writer: dataStream }) => {
+        let contextPrompt = '';
+        const lastUserMessage = messages[messages.length - 1];
+
+        if (lastUserMessage && lastUserMessage.role === 'user') {
+          const userQuery = lastUserMessage.parts.map((part: any) => part.text).join(' ');
+
+          try {
+            const relevantDocs = await this.documentQueryService.searchDocuments({
+              chatId,
+              query: userQuery,
+              limit: 3,
+            });
+            
+            if (relevantDocs.length > 0) {
+              contextPrompt = '\n\nRelevant context from uploaded documents:\n';
+              relevantDocs.forEach(doc => {
+                contextPrompt += `\n---\n${doc.text}\n---\n`;
+              });
+              contextPrompt += '\nPlease use the above context to inform your response. ';
+            }
+          } catch (error) {
+            console.error('Error searching documents:', error);
+          }
+        }
+
         const result = streamText({
           model: openai(selectedChatModel || 'gpt-4o'),
-          system: this.getSystemPrompt(selectedChatModel),
+          system: this.getSystemPrompt(selectedChatModel) + contextPrompt,
           messages: this.convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),

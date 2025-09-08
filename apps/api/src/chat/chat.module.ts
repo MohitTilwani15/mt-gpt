@@ -1,19 +1,27 @@
 import { Module } from '@nestjs/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { FileController } from './controllers/file.controller';
+import { FileDocumentService } from './services/file-document.service';
+import { CloudflareR2Service } from '../services/cloudflare-r2.service';
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
 import { StreamQueryService } from 'src/database/queries/stream.query';
+import { DocumentQueryService } from 'src/database/queries/document.query';
 import { DatabaseModule } from 'src/database/database.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [ChatController],
+  imports: [DatabaseModule, ConfigModule],
+  controllers: [ChatController, FileController],
   providers: [
     ChatService,
+    FileDocumentService,
+    CloudflareR2Service,
     ChatQueryService,
     MessageQueryService,
     StreamQueryService,
+    DocumentQueryService,
   ],
 })
 export class ChatModule {}
