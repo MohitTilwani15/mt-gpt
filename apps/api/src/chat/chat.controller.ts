@@ -1,13 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
+import {
+  Controller,
+  Get,
+  Post,
   Patch,
-  Delete, 
-  Query, 
-  Body, 
-  Param, 
-  Res, 
+  Delete,
+  Query,
+  Body,
+  Param,
+  Res,
   UseGuards,
   HttpStatus,
 } from '@nestjs/common';
@@ -17,15 +17,20 @@ import { Readable } from 'stream';
 import { JsonToSseTransformStream } from 'ai';
 
 import { ChatService } from './chat.service';
-import { PostChatRequestDto, GetChatsQueryDto, DeleteChatQueryDto, GetVotesQueryDto, VoteMessageDto, GetMessagesQueryDto } from './dto/chat.dto';
+import {
+  PostChatRequestDto,
+  GetChatsQueryDto,
+  DeleteChatQueryDto,
+  GetVotesQueryDto,
+  VoteMessageDto,
+  GetMessagesQueryDto,
+} from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
 
 @Controller('chat')
 @UseGuards(AuthGuard)
 export class ChatController {
-  constructor(
-    private readonly chatService: ChatService,
-  ) {}
+  constructor(private readonly chatService: ChatService) {}
 
   @Post()
   async createChat(
@@ -34,13 +39,15 @@ export class ChatController {
     @Res() res: Response,
   ) {
     try {
-      const result = await this.chatService.createChat(body, session)
+      const result = await this.chatService.createChat(body, session);
       const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
       const nodeReadable = Readable.fromWeb(webSseStream);
 
       nodeReadable.on('error', (err) => {
         try {
-          res.write(`event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`);
+          res.write(
+            `event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`,
+          );
         } finally {
           res.end();
         }
@@ -59,7 +66,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       console.error('Unhandled error in chat API:', error);
       return res.status(500).json({
         error: 'offline:chat',
@@ -69,7 +76,11 @@ export class ChatController {
   }
 
   @Get()
-  async getChats(@Query() query: GetChatsQueryDto, @Session() session: UserSession, @Res() res: Response) {
+  async getChats(
+    @Query() query: GetChatsQueryDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
     try {
       const limit = Number.parseInt(query.limit || '10');
       const startingAfter = query.startingAfter;
@@ -96,7 +107,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -105,7 +116,11 @@ export class ChatController {
   }
 
   @Get('votes')
-  async getVotes(@Query() query: GetVotesQueryDto, @Session() session: UserSession, @Res() res: Response) {
+  async getVotes(
+    @Query() query: GetVotesQueryDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
     try {
       if (!query.chatId) {
         throw new ChatSDKError(
@@ -114,7 +129,10 @@ export class ChatController {
         );
       }
 
-      const votes = await this.chatService.getVotesByChatId(query.chatId, session);
+      const votes = await this.chatService.getVotesByChatId(
+        query.chatId,
+        session,
+      );
       return res.json(votes);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -123,7 +141,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -132,7 +150,11 @@ export class ChatController {
   }
 
   @Get(':id')
-  async getChatById(@Param('id') id: string, @Session() session: UserSession, @Res() res: Response) {
+  async getChatById(
+    @Param('id') id: string,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
     try {
       const result = await this.chatService.getChatById(id, session);
       return res.json(result);
@@ -143,7 +165,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(500).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -152,7 +174,11 @@ export class ChatController {
   }
 
   @Get(':id/stream')
-  async getChatStream(@Param('id') id: string, @Session() session: UserSession, @Res() res: Response) {
+  async getChatStream(
+    @Param('id') id: string,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
     try {
       const result = await this.chatService.getChatStream(id, session);
       const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
@@ -160,7 +186,9 @@ export class ChatController {
 
       nodeReadable.on('error', (err) => {
         try {
-          res.write(`event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`);
+          res.write(
+            `event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`,
+          );
         } finally {
           res.end();
         }
@@ -179,7 +207,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(500).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -188,7 +216,11 @@ export class ChatController {
   }
 
   @Delete()
-  async deleteChat(@Query() query: DeleteChatQueryDto, @Session() session: UserSession, @Res() res: Response) {
+  async deleteChat(
+    @Query() query: DeleteChatQueryDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
     try {
       const result = await this.chatService.deleteChat(query.id, session);
       return res.json(result);
@@ -199,7 +231,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -221,7 +253,12 @@ export class ChatController {
         );
       }
 
-      await this.chatService.voteMessage(body.chatId, body.messageId, body.type, session);
+      await this.chatService.voteMessage(
+        body.chatId,
+        body.messageId,
+        body.type,
+        session,
+      );
       return res.status(HttpStatus.OK).send({ success: true });
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -230,7 +267,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -246,7 +283,11 @@ export class ChatController {
     @Res() res: Response,
   ) {
     try {
-      const messages = await this.chatService.getMessagesByChatId(chatId, query, session);
+      const messages = await this.chatService.getMessagesByChatId(
+        chatId,
+        query,
+        session,
+      );
       return res.json(messages);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -255,7 +296,7 @@ export class ChatController {
           message: error.message,
         });
       }
-      
+
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
@@ -276,7 +317,7 @@ export class ChatController {
       'rate_limit:chat': HttpStatus.TOO_MANY_REQUESTS,
       'offline:chat': HttpStatus.INTERNAL_SERVER_ERROR,
     };
-    
+
     return statusMap[errorCode] || HttpStatus.INTERNAL_SERVER_ERROR;
   }
 }

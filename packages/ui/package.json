@@ -3,9 +3,6 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
-  "scripts": {
-    "lint": "eslint . --max-warnings 0"
-  },
   "dependencies": {
     "@icons-pack/react-simple-icons": "^13.7.0",
     "@radix-ui/react-avatar": "^1.1.10",
