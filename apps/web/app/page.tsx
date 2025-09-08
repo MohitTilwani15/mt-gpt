@@ -58,6 +58,12 @@ const TextInputAttachments = dynamic(
     loading: () => <div>Loading attachments...</div>,
   },
 );
+const ConversationHistory = dynamic(
+  () => import("../components/conversation-history"),
+  {
+    loading: () => <div>Loading history...</div>,
+  },
+);
 
 interface Message {
   id: string;
@@ -301,6 +307,11 @@ export default function Page() {
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h1 className="text-lg font-semibold">AI Chat</h1>
+          <ConversationHistory />
+        </div>
+        
         <div className="flex-1 overflow-hidden">
           <Conversation className="h-full">
             <ConversationContent>

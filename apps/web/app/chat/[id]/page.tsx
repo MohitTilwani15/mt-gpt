@@ -60,6 +60,12 @@ const TextInputAttachments = dynamic(
     loading: () => <div>Loading attachments...</div>,
   },
 );
+const ConversationHistory = dynamic(
+  () => import("../../../components/conversation-history"),
+  {
+    loading: () => <div>Loading history...</div>,
+  },
+);
 
 interface Message {
   id: string;
@@ -380,7 +386,7 @@ export default function ChatPage() {
             Back
           </Button>
           <h1 className="text-lg font-semibold">Chat</h1>
-          <div className="w-8" /> {/* Spacer for alignment */}
+          <ConversationHistory />
         </div>
 
         {/* Messages */}
