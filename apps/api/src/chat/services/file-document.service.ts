@@ -9,6 +9,7 @@ import { extractText, getDocumentProxy } from 'unpdf';
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { databaseSchema } from '../../database/schemas';
+import { DEFAULT_DOWNLOAD_URL_EXPIRY } from '../../lib/utils';
 
 
 export interface CreateFileDocumentParams {
@@ -144,7 +145,7 @@ export class FileDocumentService {
   }
 
   async getDownloadUrl(params: GetDownloadUrlParams) {
-    const { documentId, expiresIn = 3600 } = params;
+    const { documentId, expiresIn = DEFAULT_DOWNLOAD_URL_EXPIRY } = params;
 
     const [document] = await this.db
       .select()

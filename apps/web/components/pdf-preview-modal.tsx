@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { XIcon, FileIcon, DownloadIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { Button } from '@workspace/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@workspace/ui/components/card';
+import { formatFileSize } from '../lib/utils';
 
-interface Document {
+interface PreviewDocument {
   id: string;
   fileName: string;
   fileSize: number;
@@ -18,12 +19,11 @@ interface Document {
 interface PDFPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  document: Document | null;
+  document: PreviewDocument | null;
 }
 
 export default function PDFPreviewModal({ isOpen, onClose, document }: PDFPreviewModalProps) {
   const [showExtractedText, setShowExtractedText] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -32,14 +32,6 @@ export default function PDFPreviewModal({ isOpen, onClose, document }: PDFPrevie
   }, [isOpen]);
 
   if (!isOpen || !document) return null;
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   const handleDownload = () => {
     window.open(document.downloadUrl, '_blank');
