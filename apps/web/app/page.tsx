@@ -1,7 +1,7 @@
 'use client';
 
 import { v4 as uuidv4 } from 'uuid';
-import { MicIcon, PaperclipIcon, BotIcon, XIcon, FileIcon, DownloadIcon } from 'lucide-react';
+import { MicIcon, PaperclipIcon, BotIcon, XIcon } from 'lucide-react';
 import { FormEventHandler, useState, useRef, useEffect, useCallback } from "react";
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -22,9 +22,9 @@ import {
 import { Message, MessageContent } from '@workspace/ui/components/ui/shadcn-io/ai/message';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import { Button } from '@workspace/ui/components/button';
-import { Card, CardContent } from '@workspace/ui/components/card';
 import PDFPreviewModal from '../components/pdf-preview-modal';
 import DocumentAttachments from '../components/document-attachments';
+import TextInputAttachments from '../components/text-input-attachments';
 import { formatFileSize, SUPPORTED_FILE_TYPES } from '../lib/utils';
 
 interface Message {
@@ -238,46 +238,12 @@ export default function Page() {
         </Conversation>
       </div>
       
-      {uploadedFiles.length > 0 && (
-        <div className='p-4 border-t bg-background'>
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Attached Files</h4>
-            <div className="flex flex-wrap gap-2">
-              {uploadedFiles.map((file) => (
-                <Card key={file.id} className="flex items-center gap-2 p-2 max-w-xs">
-                  <CardContent className="flex items-center gap-2 p-0">
-                    <FileIcon className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{file.fileName}</p>
-                      <p className="text-xs text-muted-foreground">{formatFileSize(file.fileSize)}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(file.downloadUrl, '_blank')}
-                      >
-                        <DownloadIcon className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(file.id)}
-                        disabled={isUploading}
-                      >
-                        <XIcon className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className='p-4 border-t bg-background'>
+      <div className='p-4 bg-background'>
         <PromptInput onSubmit={handleSubmit}>
+          <TextInputAttachments 
+            files={uploadedFiles}
+            onRemoveFile={removeFile}
+          />
           <PromptInputTextarea
             onChange={(e) => setText(e.target.value)}
             value={text}
