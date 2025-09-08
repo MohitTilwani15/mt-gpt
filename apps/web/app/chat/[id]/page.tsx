@@ -1,7 +1,7 @@
 "use client";
 
 import { v4 as uuidv4 } from "uuid";
-import { MicIcon, PaperclipIcon, BotIcon, FileIcon } from "lucide-react";
+import { MicIcon, PaperclipIcon, BotIcon, FileIcon, ArrowLeftIcon } from "lucide-react";
 import {
   FormEventHandler,
   useState,
@@ -12,10 +12,11 @@ import {
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import dynamic from "next/dynamic";
+import { useRouter, useParams } from "next/navigation";
 
-import { SUPPORTED_FILE_TYPES, formatFileSize } from "../lib/utils";
-import ErrorBoundary from "../components/error-boundary";
-import MarkdownRenderer from "../components/markdown-renderer";
+import { SUPPORTED_FILE_TYPES, formatFileSize } from "../../../lib/utils";
+import ErrorBoundary from "../../../components/error-boundary";
+import MarkdownRenderer from "../../../components/markdown-renderer";
 
 import {
   PromptInput,
@@ -39,21 +40,22 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@workspace/ui/components/ui/shadcn-io/ai/conversation";
+import { Button } from "@workspace/ui/components/button";
 
 const PDFPreviewModal = dynamic(
-  () => import("../components/pdf-preview-modal"),
+  () => import("../../../components/pdf-preview-modal"),
   {
     loading: () => <div>Loading preview...</div>,
   },
 );
 const DocumentAttachments = dynamic(
-  () => import("../components/document-attachments"),
+  () => import("../../../components/document-attachments"),
   {
     loading: () => <div>Loading attachments...</div>,
   },
 );
 const TextInputAttachments = dynamic(
-  () => import("../components/text-input-attachments"),
+  () => import("../../../components/text-input-attachments"),
   {
     loading: () => <div>Loading attachments...</div>,
   },
@@ -91,8 +93,11 @@ const models = [
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
 ] as const;
 
-export default function Page() {
-  const [chatId] = useState(() => uuidv4());
+export default function ChatPage() {
+  const router = useRouter();
+  const params = useParams();
+  const chatId = params.id as string;
+  
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [messageDocuments, setMessageDocuments] = useState<
@@ -105,9 +110,11 @@ export default function Page() {
   const [previewDocument, setPreviewDocument] =
     useState<MessageDocument | null>(null);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, setMessages } = useChat({
     generateId: () => uuidv4(),
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -124,6 +131,7 @@ export default function Page() {
       },
     }),
   });
+
   const [text, setText] = useState<string>("");
   const [model, setModel] = useState<string>(models[0]?.id || "");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -135,6 +143,50 @@ export default function Page() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load existing chat messages
+  useEffect(() => {
+    const loadChat = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch chat details and messages using the messages endpoint
+        const messagesResponse = await fetch(`/api/chat/${chatId}/messages?limit=100`, {
+          credentials: "include",
+        });
+
+        if (!messagesResponse.ok) {
+          if (messagesResponse.status === 404) {
+            router.push("/");
+            return;
+          }
+          throw new Error("Failed to load chat");
+        }
+
+        const data = await messagesResponse.json();
+        
+        // Transform the messages to the expected format and set them
+        const transformedMessages = data.messages.map((msg: any) => ({
+          id: msg.id,
+          role: msg.role,
+          parts: msg.parts || [{ type: "text", text: msg.content || "" }],
+          createdAt: new Date(msg.createdAt),
+        }));
+
+        setMessages(transformedMessages);
+      } catch (err) {
+        console.error("Error loading chat:", err);
+        setError(err instanceof Error ? err.message : "Failed to load chat");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (chatId) {
+      loadChat();
+    }
+  }, [chatId, router, setMessages]);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
@@ -148,12 +200,6 @@ export default function Page() {
       formData.append("chatId", chatId);
       formData.append("extractText", "true");
 
-      console.log("Uploading files...", {
-        chatId,
-        fileCount: fileArray.length,
-        fileNames: fileArray.map((f) => f.name),
-      });
-
       try {
         setIsUploading(true);
         const response = await fetch("/api/files/upload", {
@@ -164,7 +210,6 @@ export default function Page() {
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("Upload response error:", response.status, errorText);
           throw new Error(`Upload failed: ${response.status} - ${errorText}`);
         }
 
@@ -298,9 +343,47 @@ export default function Page() {
     }
   };
 
+  const handleBack = () => {
+    router.push("/");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading chat...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center max-w-md">
+          <h2 className="text-xl font-semibold mb-2">Error</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={handleBack}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <Button variant="ghost" onClick={handleBack} className="gap-2">
+            <ArrowLeftIcon size={16} />
+            Back
+          </Button>
+          <h1 className="text-lg font-semibold">Chat</h1>
+          <div className="w-8" /> {/* Spacer for alignment */}
+        </div>
+
+        {/* Messages */}
         <div className="flex-1 overflow-hidden">
           <Conversation className="h-full">
             <ConversationContent>
@@ -309,7 +392,7 @@ export default function Page() {
                   <div className="text-center">
                     <BotIcon className="mx-auto h-12 w-12 mb-4 opacity-50" />
                     <h3 className="text-lg font-semibold mb-2">
-                      Welcome to AI Chat
+                      No messages yet
                     </h3>
                     <p className="text-sm">
                       Start a conversation by typing a message below.
@@ -364,6 +447,7 @@ export default function Page() {
           </Conversation>
         </div>
 
+        {/* Input Area */}
         <div className="p-4 bg-background">
           <PromptInput onSubmit={handleSubmit}>
             <TextInputAttachments
