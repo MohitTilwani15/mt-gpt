@@ -9,11 +9,14 @@ import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { databaseSchema } from '../../database/schemas';
 
+const pdfParse = require('pdf-parse');
+
 export interface CreateFileDocumentParams {
   chatId: string;
   messageId?: string;
   file: Express.Multer.File;
   extractText?: boolean;
+  userId?: string;
 }
 
 export interface GetDownloadUrlParams {
@@ -30,7 +33,7 @@ export class FileDocumentService {
   ) {}
 
   async createFileDocument(params: CreateFileDocumentParams) {
-    const { chatId, messageId, file, extractText = false } = params;
+    const { chatId, messageId, file, extractText = false, userId } = params;
 
     const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
       file,
@@ -42,7 +45,6 @@ export class FileDocumentService {
     try {
       if (extractText && file.mimetype === 'application/pdf') {
         try {
-          const pdfParse = (await import('pdf-parse')).default;
           const pdfData = await pdfParse(file.buffer);
           textContent = pdfData.text;
   
@@ -59,6 +61,27 @@ export class FileDocumentService {
       }
   
       const [document] = await this.db.transaction(async (tx) => {
+        const existingChat = await tx
+          .select()
+          .from(databaseSchema.chat)
+          .where(eq(databaseSchema.chat.id, chatId))
+          .limit(1);
+
+        if (!existingChat.length) {
+          if (!userId) {
+            throw new Error('User ID is required to create a new chat');
+          }
+
+          await tx
+            .insert(databaseSchema.chat)
+            .values({
+              id: chatId,
+              createdAt: new Date(),
+              title: `Chat with ${file.originalname}`,
+              userId,
+            });
+        }
+
         const [doc] = await tx
           .insert(databaseSchema.document)
           .values({
@@ -102,8 +125,9 @@ export class FileDocumentService {
     messageId?: string;
     files: Express.Multer.File[];
     extractText?: boolean;
+    userId?: string;
   }) {
-    const { chatId, messageId, files, extractText = false } = params;
+    const { chatId, messageId, files, extractText = false, userId } = params;
 
     const createPromises = files.map(file =>
       this.createFileDocument({
@@ -111,6 +135,7 @@ export class FileDocumentService {
         messageId,
         file,
         extractText,
+        userId,
       }),
     );
 
@@ -172,10 +197,8 @@ export class FileDocumentService {
       throw new NotFoundException('Document not found');
     }
 
-    // Delete from Cloudflare R2
     await this.cloudflareR2Service.deleteFile(document.fileKey);
 
-    // Delete from database (cascade will handle MessageDocument entries)
     await this.db
       .delete(databaseSchema.document)
       .where(eq(databaseSchema.document.id, documentId));

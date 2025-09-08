@@ -3,7 +3,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, Dele
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
-import path from 'path';
+import * as path from 'path';
 
 export interface FileUploadParams {
   file: Express.Multer.File;
@@ -37,13 +37,18 @@ export class CloudflareR2Service {
   }
 
   private safeKey(original?: string) {
-    if (!original) return randomUUID();
+    if (!original || !original.trim()) return randomUUID();
     const ext = path.extname(original).slice(0, 16);
     return `${randomUUID()}${ext || ''}`;
   }
 
   async uploadFile(params: FileUploadParams): Promise<{ key: string; url: string }> {
     const { file, key, contentType } = params;
+    
+    if (!file || !file.originalname) {
+      throw new Error('Invalid file: missing originalname');
+    }
+    
     const fileKey = key ?? this.safeKey(file.originalname);
 
     const command = new PutObjectCommand({

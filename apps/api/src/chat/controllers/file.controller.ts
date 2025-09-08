@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { AuthGuard } from '@mguay/nestjs-better-auth';
+import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
 import { FileDocumentService } from '../services/file-document.service';
 import { UploadFilesDto, FileUploadResponse } from '../dto/file-upload.dto';
 
@@ -27,6 +27,7 @@ export class FileController {
   async uploadFiles(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() uploadDto: UploadFilesDto,
+    @Session() session: UserSession,
   ): Promise<FileUploadResponse> {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files provided');
@@ -41,6 +42,7 @@ export class FileController {
       messageId: uploadDto.messageId,
       files,
       extractText: uploadDto.extractText,
+      userId: session.user.id,
     });
 
     return {

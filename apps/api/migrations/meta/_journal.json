@@ -29,6 +29,13 @@
       "when": 1757274176527,
       "tag": "0003_enable-pgvector-extension",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1757329065710,
+      "tag": "0004_quick_vindicator",
+      "breakpoints": true
     }
   ]
 }
