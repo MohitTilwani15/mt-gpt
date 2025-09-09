@@ -104,10 +104,7 @@ export class ChatService {
         .where(eq(databaseSchema.message.chatId, id))
         .orderBy(asc(databaseSchema.message.createdAt));
 
-      const uiMessages = [
-        ...this.convertToUIMessages(messagesFromDb),
-        ...messages,
-      ];
+      const uiMessages = [this.convertToUIMessages(messagesFromDb)];
 
       return this.generateAIResponse({
         chatId: id,

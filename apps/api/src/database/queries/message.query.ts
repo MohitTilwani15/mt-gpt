@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq, asc, gte, count } from 'drizzle-orm';
+import { and, eq, asc, gte, count, inArray } from 'drizzle-orm';
 
 import { ChatSDKError } from "../../lib/errors";
 import { chat, DBMessage, message } from "../schemas/conversation.schema";
@@ -146,8 +146,46 @@ export class MessageQueryService {
         messages.pop();
       }
 
+      // Fetch documents linked to the returned messages using Document.messageId
+      const messageIds = messages.map((m) => m.id);
+      let messageDocuments: Record<string, Array<{
+        id: string;
+        fileName: string;
+        fileSize: number;
+        mimeType: string;
+        createdAt: Date;
+      }>> = {};
+
+      if (messageIds.length > 0) {
+        const docs = await this.db
+          .select({
+            messageId: databaseSchema.document.messageId,
+            id: databaseSchema.document.id,
+            fileName: databaseSchema.document.fileName,
+            fileSize: databaseSchema.document.fileSize,
+            mimeType: databaseSchema.document.mimeType,
+            createdAt: databaseSchema.document.createdAt,
+          })
+          .from(databaseSchema.document)
+          .where(inArray(databaseSchema.document.messageId, messageIds));
+
+        messageDocuments = docs.reduce<typeof messageDocuments>((acc, doc) => {
+          if (!doc.messageId) return acc;
+          if (!acc[doc.messageId]) acc[doc.messageId] = [];
+          acc[doc.messageId].push({
+            id: doc.id,
+            fileName: doc.fileName,
+            fileSize: doc.fileSize,
+            mimeType: doc.mimeType,
+            createdAt: doc.createdAt,
+          });
+          return acc;
+        }, {} as typeof messageDocuments);
+      }
+
       return {
         messages,
+        messageDocuments,
         hasMore,
         nextCursor: hasMore ? messages[messages.length - 1]?.id : null,
       };
