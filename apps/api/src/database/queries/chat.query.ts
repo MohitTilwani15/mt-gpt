@@ -21,14 +21,14 @@ export class ChatQueryService {
   }: {
     id: string;
     userId: string;
-    title: string;
+    title?: string;
   }) {
     try {
       return await this.db.insert(chat).values({
         id,
-        createdAt: new Date(),
         userId,
         title,
+        createdAt: new Date(),
       });
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to save chat');

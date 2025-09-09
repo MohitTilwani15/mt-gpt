@@ -6,11 +6,13 @@ import {
   createUIMessageStream,
   stepCountIs,
   smoothStream,
+  convertToModelMessages,
+  UIMessage,
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, asc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
@@ -38,7 +40,7 @@ export class ChatService {
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
-    const { id, messages, selectedChatModel } = requestBody;
+    const { id, message, selectedChatModel } = requestBody;
 
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
@@ -46,44 +48,42 @@ export class ChatService {
     }
 
     return this.db.transaction(async (transaction) => {
-      if (!existingChat) {
+      if (existingChat && !existingChat.title) {
         const title = await this.generateTitleFromUserMessage(
-          messages[messages.length - 1].parts
+          message.parts
+            .filter((part) => part.type === 'text')
             .map((part) => part.text)
             .join(' '),
         );
 
-        await transaction.insert(databaseSchema.chat).values({
-          id,
-          userId: session.user.id,
-          title,
-          createdAt: new Date(),
-        });
+        await transaction.update(databaseSchema.chat)
+          .set({ title })
+          .where(eq(databaseSchema.chat.id, id));
       }
 
-      await transaction
-        .insert(databaseSchema.message)
-        .values({
-          id: messages[messages.length - 1].id,
-          chatId: id,
-          role: 'user',
-          createdAt: new Date(),
-        })
-        .returning();
+      await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message })
 
-      const messagesFromDb = await transaction
-        .select()
-        .from(databaseSchema.message)
-        .where(eq(databaseSchema.message.chatId, id))
-        .orderBy(asc(databaseSchema.message.createdAt))
-        .limit(5);
-
-      const uiMessages = [this.convertToUIMessages(messagesFromDb)];
+      const messages = await transaction.query.message.findMany({
+        where: eq(databaseSchema.message.chatId, existingChat.id),
+        with: {
+          parts: {
+            orderBy: (parts, { asc }) => [asc(parts.order)],
+          },
+        },
+        orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+      });
+    
+      const messages1 = messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
+      }));
 
       return this.generateAIResponse({
         chatId: id,
-        messages: uiMessages,
+        messages: messages1,
         selectedChatModel,
+        message
       });
     });
   }
@@ -98,6 +98,21 @@ export class ChatService {
       startingAfter: query.startingAfter || null,
       endingBefore: query.endingBefore || null,
     });
+  }
+
+  async createNewChat(chatId: string, session: UserSession) {
+    await this.chatQueryService.createChat({
+      id: chatId,
+      userId: session.user.id,
+      title: 'New Chat',
+    });
+
+    return {
+      id: chatId,
+      title: 'New Chat',
+      userId: session.user.id,
+      createdAt: new Date(),
+    };
   }
 
   async getChatById(chatId: string, session: UserSession) {
@@ -118,10 +133,12 @@ export class ChatService {
     chatId,
     messages,
     selectedChatModel,
+    message
   }: {
     chatId: string;
-    messages: any[];
+    messages: UIMessage[];
     selectedChatModel: ChatModel;
+    message: UIMessage;
   }) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -157,7 +174,7 @@ export class ChatService {
         const result = streamText({
           model: openai(selectedChatModel || 'gpt-4o'),
           system: this.getSystemPrompt() + contextPrompt,
-          messages: this.convertToModelMessages(messages),
+          messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),
         });
@@ -171,16 +188,8 @@ export class ChatService {
         );
       },
       generateId: uuidv4,
-      onFinish: async ({ messages }) => {
-        // await this.messageQueryService.saveMessages({
-        //   messages: messages.map((message) => ({
-        //     id: message.id,
-        //     chatId,
-        //     role: message.role,
-        //     createdAt: new Date(),
-        //   })),
-        // });
-        console.log('messages' , messages)
+      onFinish: async ({ responseMessage }) => {
+        await this.messageQueryService.upsertMessage({ messageId: responseMessage.id, chatId, message: responseMessage })
       },
       onError: () => {
         return 'Oops, an error occurred!';
@@ -202,20 +211,6 @@ export class ChatService {
     });
 
     return title;
-  }
-
-  private convertToUIMessages(messages: DBMessage[]): any[] {
-    return messages.map((msg) => ({
-      id: msg.id,
-      role: msg.role,
-    }));
-  }
-
-  private convertToModelMessages(messages: any[]): any[] {
-    return messages.map((msg) => ({
-      role: msg.role,
-      content: msg.parts.map((part: any) => part.text).join(''),
-    }));
   }
 
   private getSystemPrompt(): string {

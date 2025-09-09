@@ -10,7 +10,7 @@ import { MyProviderMetadata } from '../../lib/message-type'
 export const chat = pgTable('Chat', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
-  title: text('title').notNull(),
+  title: text('title'),
   userId: text('userId')
     .notNull()
     .references(() => user.id),
@@ -24,7 +24,7 @@ export const message = pgTable('Message',
     chatId: uuid('chatId')
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
-    role: varchar('role').notNull(),
+    role: varchar().$type<UIMessage["role"]>().notNull(),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
   },
   (table) => [

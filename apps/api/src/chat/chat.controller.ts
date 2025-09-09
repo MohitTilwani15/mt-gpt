@@ -134,6 +134,30 @@ export class ChatController {
     }
   }
 
+  @Post('create')
+  async createNewChat(
+    @Body() body: { id: string },
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const chat = await this.chatService.createNewChat(body.id, session);
+      return res.json(chat);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Internal server error',
+      });
+    }
+  }
+
   @Get(':id/messages')
   async getMessagesByChatId(
     @Param('id') chatId: string,
