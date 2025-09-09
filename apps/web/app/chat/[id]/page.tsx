@@ -48,14 +48,14 @@ export default function ChatPage() {
     transport: new DefaultChatTransport({
       api: "/api/chat",
       prepareSendMessagesRequest({ messages, body }) {
-        return {
-          body: {
-            id: chatId,
-            messages,
-            selectedChatModel: model,
-            ...body,
-          },
-        };
+        const lastMessage = messages[messages.length - 1];
+          return {
+            body: {
+              id: chatId,
+              selectedChatModel: model,
+              message: lastMessage,
+            },
+          };
       },
     }),
   });

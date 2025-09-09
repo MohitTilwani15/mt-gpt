@@ -2,8 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
-  Delete,
   Query,
   Body,
   Param,
@@ -20,9 +18,6 @@ import { ChatService } from './chat.service';
 import {
   PostChatRequestDto,
   GetChatsQueryDto,
-  DeleteChatQueryDto,
-  GetVotesQueryDto,
-  VoteMessageDto,
   GetMessagesQueryDto,
 } from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
@@ -115,40 +110,6 @@ export class ChatController {
     }
   }
 
-  @Get('votes')
-  async getVotes(
-    @Query() query: GetVotesQueryDto,
-    @Session() session: UserSession,
-    @Res() res: Response,
-  ) {
-    try {
-      if (!query.chatId) {
-        throw new ChatSDKError(
-          'bad_request:api',
-          'Parameter chatId is required.',
-        );
-      }
-
-      const votes = await this.chatService.getVotesByChatId(
-        query.chatId,
-        session,
-      );
-      return res.json(votes);
-    } catch (error) {
-      if (error instanceof ChatSDKError) {
-        return res.status(this.getHttpStatus(error.type)).json({
-          error: error.type,
-          message: error.message,
-        });
-      }
-
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        error: 'offline:chat',
-        message: 'Internal server error',
-      });
-    }
-  }
-
   @Get(':id')
   async getChatById(
     @Param('id') id: string,
@@ -167,108 +128,6 @@ export class ChatController {
       }
 
       return res.status(500).json({
-        error: 'offline:chat',
-        message: 'Internal server error',
-      });
-    }
-  }
-
-  @Get(':id/stream')
-  async getChatStream(
-    @Param('id') id: string,
-    @Session() session: UserSession,
-    @Res() res: Response,
-  ) {
-    try {
-      const result = await this.chatService.getChatStream(id, session);
-      const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
-      const nodeReadable = Readable.fromWeb(webSseStream);
-
-      nodeReadable.on('error', (err) => {
-        try {
-          res.write(
-            `event: error\ndata: ${JSON.stringify({ message: 'stream_error' })}\n\n`,
-          );
-        } finally {
-          res.end();
-        }
-      });
-
-      nodeReadable.on('end', () => {
-        res.end();
-      });
-
-      nodeReadable.pipe(res);
-      return;
-    } catch (error) {
-      if (error instanceof ChatSDKError) {
-        return res.status(this.getHttpStatus(error.type)).json({
-          error: error.type,
-          message: error.message,
-        });
-      }
-
-      return res.status(500).json({
-        error: 'offline:chat',
-        message: 'Internal server error',
-      });
-    }
-  }
-
-  @Delete()
-  async deleteChat(
-    @Query() query: DeleteChatQueryDto,
-    @Session() session: UserSession,
-    @Res() res: Response,
-  ) {
-    try {
-      const result = await this.chatService.deleteChat(query.id, session);
-      return res.json(result);
-    } catch (error) {
-      if (error instanceof ChatSDKError) {
-        return res.status(this.getHttpStatus(error.type)).json({
-          error: error.type,
-          message: error.message,
-        });
-      }
-
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        error: 'offline:chat',
-        message: 'Internal server error',
-      });
-    }
-  }
-
-  @Patch('vote')
-  async voteMessage(
-    @Body() body: VoteMessageDto,
-    @Session() session: UserSession,
-    @Res() res: Response,
-  ) {
-    try {
-      if (!body.chatId || !body.messageId || !body.type) {
-        throw new ChatSDKError(
-          'bad_request:api',
-          'Parameters chatId, messageId, and type are required.',
-        );
-      }
-
-      await this.chatService.voteMessage(
-        body.chatId,
-        body.messageId,
-        body.type,
-        session,
-      );
-      return res.status(HttpStatus.OK).send({ success: true });
-    } catch (error) {
-      if (error instanceof ChatSDKError) {
-        return res.status(this.getHttpStatus(error.type)).json({
-          error: error.type,
-          message: error.message,
-        });
-      }
-
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
       });

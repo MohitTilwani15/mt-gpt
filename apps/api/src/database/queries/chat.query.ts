@@ -3,10 +3,9 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, gt, lt, SQL } from 'drizzle-orm';
 
 import { ChatSDKError } from "../../lib/errors";
-import { Chat, chat, vote } from "../schemas/conversation.schema";
+import { Chat, chat } from "../schemas/conversation.schema";
 import { DATABASE_CONNECTION } from '../database-connection';
 import { databaseSchema } from '../schemas';
-import { PostgresTransaction } from '../postgres-transaction';
 
 @Injectable()
 export class ChatQueryService {
@@ -15,7 +14,7 @@ export class ChatQueryService {
     private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
-  async saveChat({
+  async createChat({
     id,
     userId,
     title,
@@ -34,34 +33,6 @@ export class ChatQueryService {
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to save chat');
     }
-  }
-
-  async deleteChatById({ id }: { id: string }) {
-    return this.db.transaction(async (transaction) => {
-      await transaction.delete(databaseSchema.vote).where(eq(databaseSchema.vote.chatId, id));
-      await transaction.delete(databaseSchema.message).where(eq(databaseSchema.message.chatId, id));
-      await transaction.delete(databaseSchema.stream).where(eq(databaseSchema.stream.chatId, id));
-
-      const [chatsDeleted] = await transaction
-        .delete(databaseSchema.chat)
-        .where(eq(databaseSchema.chat.id, id))
-        .returning();
-      
-      return chatsDeleted;
-    });
-  }
-
-  async deleteChatByIdWithTransaction({ id }: { id: string }, transaction: PostgresTransaction) {
-    await transaction.delete(databaseSchema.vote).where(eq(databaseSchema.vote.chatId, id));
-    await transaction.delete(databaseSchema.message).where(eq(databaseSchema.message.chatId, id));
-    await transaction.delete(databaseSchema.stream).where(eq(databaseSchema.stream.chatId, id));
-
-    const [chatsDeleted] = await transaction
-      .delete(databaseSchema.chat)
-      .where(eq(databaseSchema.chat.id, id))
-      .returning();
-    
-    return chatsDeleted;
   }
 
   async getChatsByUserId({
@@ -146,14 +117,6 @@ export class ChatQueryService {
       return selectedChat;
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to get chat by id');
-    }
-  }
-
-  async getVotesByChatId({ chatId }: { chatId: string }) {
-    try {
-      return await this.db.select().from(vote).where(eq(vote.chatId, chatId));
-    } catch (error) {
-      throw new ChatSDKError('bad_request:database', 'Failed to get votes by chat id');
     }
   }
 }

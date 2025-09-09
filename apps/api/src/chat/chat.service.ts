@@ -24,6 +24,8 @@ import {
 import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
+import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
+import { DBMessage } from '../database/schemas/conversation.schema'
 
 @Injectable()
 export class ChatService {
@@ -36,7 +38,7 @@ export class ChatService {
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
-    const { id, messages, selectedChatModel, documentIds } = requestBody;
+    const { id, messages, selectedChatModel } = requestBody;
 
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
@@ -53,56 +55,28 @@ export class ChatService {
 
         await transaction.insert(databaseSchema.chat).values({
           id,
-          createdAt: new Date(),
           userId: session.user.id,
           title,
+          createdAt: new Date(),
         });
       }
 
-      const existingMessage = await transaction
-        .select()
-        .from(databaseSchema.message)
-        .where(eq(databaseSchema.message.id, messages[messages.length - 1].id))
-        .limit(1);
-
-      if (!existingMessage.length) {
-        const messageInsert = await transaction
-          .insert(databaseSchema.message)
-          .values({
-            chatId: id,
-            id: messages[messages.length - 1].id,
-            role: 'user',
-            parts: messages[messages.length - 1].parts,
-            attachments: [],
-            createdAt: new Date(),
-          })
-          .returning();
-
-        const insertedMessageId = messageInsert[0].id;
-
-        if (documentIds && documentIds.length > 0) {
-          const linkPromises = documentIds.map((documentId) =>
-            transaction.insert(databaseSchema.messageDocument).values({
-              messageId: insertedMessageId,
-              documentId,
-            }),
-          );
-          await Promise.all(linkPromises);
-        }
-      }
-
-      const streamId = uuidv4();
-      await transaction.insert(databaseSchema.stream).values({
-        id: streamId,
-        chatId: id,
-        createdAt: new Date(),
-      });
+      await transaction
+        .insert(databaseSchema.message)
+        .values({
+          id: messages[messages.length - 1].id,
+          chatId: id,
+          role: 'user',
+          createdAt: new Date(),
+        })
+        .returning();
 
       const messagesFromDb = await transaction
         .select()
         .from(databaseSchema.message)
         .where(eq(databaseSchema.message.chatId, id))
-        .orderBy(asc(databaseSchema.message.createdAt));
+        .orderBy(asc(databaseSchema.message.createdAt))
+        .limit(5);
 
       const uiMessages = [this.convertToUIMessages(messagesFromDb)];
 
@@ -140,67 +114,6 @@ export class ChatService {
     return chat;
   }
 
-  async deleteChat(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:chat');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:chat');
-    }
-
-    return this.chatQueryService.deleteChatById({ id: chatId });
-  }
-
-  async getChatStream(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:chat');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:chat');
-    }
-
-    const messages = await this.messageQueryService.getMessagesByChatId({
-      chatId,
-    });
-
-    if (!messages.length) {
-      throw new ChatSDKError('not_found:stream');
-    }
-
-    const stream = createUIMessageStream({
-      execute: ({ writer: dataStream }) => {
-        messages.forEach((message) => {
-          dataStream.write({
-            type: 'data-message',
-            data: {
-              id: message.id,
-              role: message.role,
-              parts: message.parts,
-              attachments: message.attachments,
-            },
-          });
-        });
-
-        dataStream.write({
-          type: 'finish',
-        });
-      },
-      generateId: uuidv4,
-      onFinish: async () => {},
-      onError: () => {
-        return 'Oops, an error occurred!';
-      },
-    });
-
-    return stream;
-  }
-
   private async generateAIResponse({
     chatId,
     messages,
@@ -213,10 +126,10 @@ export class ChatService {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         let contextPrompt = '';
-        const lastUserMessage = messages[messages.length - 1];
+        const lastMessage = messages[messages.length - 1];
 
-        if (lastUserMessage && lastUserMessage.role === 'user') {
-          const userQuery = lastUserMessage.parts
+        if (lastMessage && lastMessage.role === 'user') {
+          const userQuery = lastMessage.parts
             .map((part: any) => part.text)
             .join(' ');
 
@@ -259,16 +172,15 @@ export class ChatService {
       },
       generateId: uuidv4,
       onFinish: async ({ messages }) => {
-        await this.messageQueryService.saveMessages({
-          messages: messages.map((message) => ({
-            id: message.id,
-            role: message.role,
-            parts: message.parts,
-            createdAt: new Date(),
-            attachments: [],
-            chatId,
-          })),
-        });
+        // await this.messageQueryService.saveMessages({
+        //   messages: messages.map((message) => ({
+        //     id: message.id,
+        //     chatId,
+        //     role: message.role,
+        //     createdAt: new Date(),
+        //   })),
+        // });
+        console.log('messages' , messages)
       },
       onError: () => {
         return 'Oops, an error occurred!';
@@ -292,12 +204,10 @@ export class ChatService {
     return title;
   }
 
-  private convertToUIMessages(messages: any[]): any[] {
+  private convertToUIMessages(messages: DBMessage[]): any[] {
     return messages.map((msg) => ({
       id: msg.id,
       role: msg.role,
-      parts: msg.parts,
-      attachments: msg.attachments,
     }));
   }
 
@@ -310,43 +220,6 @@ export class ChatService {
 
   private getSystemPrompt(): string {
     return `You are a helpful AI assistant. Please provide clear and helpful responses.`;
-  }
-
-  async getVotesByChatId(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:chat');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:vote');
-    }
-
-    return this.chatQueryService.getVotesByChatId({ chatId });
-  }
-
-  async voteMessage(
-    chatId: string,
-    messageId: string,
-    type: 'up' | 'down',
-    session: UserSession,
-  ) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:vote');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:vote');
-    }
-
-    await this.messageQueryService.voteMessage({
-      chatId,
-      messageId,
-      type,
-    });
   }
 
   async getMessagesByChatId(

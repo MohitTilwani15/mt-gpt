@@ -39,11 +39,6 @@ export class PostChatRequestDto {
 
   @IsEnum(ChatModel)
   selectedChatModel: ChatModel;
-
-  @IsOptional()
-  @IsArray()
-  @IsUUID('4', { each: true })
-  documentIds?: string[];
 }
 
 export class GetChatsQueryDto {

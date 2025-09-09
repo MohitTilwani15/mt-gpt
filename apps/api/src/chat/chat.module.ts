@@ -6,7 +6,6 @@ import { FileDocumentService } from './services/file-document.service';
 import { CloudflareR2Service } from '../services/cloudflare-r2.service';
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
-import { StreamQueryService } from 'src/database/queries/stream.query';
 import { DocumentQueryService } from 'src/database/queries/document.query';
 import { DatabaseModule } from 'src/database/database.module';
 import { ConfigModule } from '@nestjs/config';
@@ -20,7 +19,6 @@ import { ConfigModule } from '@nestjs/config';
     CloudflareR2Service,
     ChatQueryService,
     MessageQueryService,
-    StreamQueryService,
     DocumentQueryService,
   ],
 })

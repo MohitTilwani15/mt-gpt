@@ -1,7 +1,7 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -9,12 +9,10 @@ import { extractText, getDocumentProxy } from 'unpdf';
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { databaseSchema } from '../../database/schemas';
-import { DEFAULT_DOWNLOAD_URL_EXPIRY } from '../../lib/utils';
 
 
 export interface CreateFileDocumentParams {
   chatId: string;
-  messageId?: string;
   file: Express.Multer.File;
   extractText?: boolean;
   userId?: string;
@@ -34,9 +32,9 @@ export class FileDocumentService {
   ) {}
 
   async createFileDocument(params: CreateFileDocumentParams) {
-    const { chatId, messageId, file, extractText: shouldExtractText = false, userId } = params;
+    const { chatId, file, extractText: shouldExtractText = false, userId } = params;
 
-    const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
+    const { key: fileKey } = await this.cloudflareR2Service.uploadFile({
       file,
     });
 
@@ -70,10 +68,6 @@ export class FileDocumentService {
           .limit(1);
 
         if (!existingChat.length) {
-          if (!userId) {
-            throw new Error('User ID is required to create a new chat');
-          }
-
           await tx
             .insert(databaseSchema.chat)
             .values({
@@ -88,7 +82,6 @@ export class FileDocumentService {
           .insert(databaseSchema.document)
           .values({
             chatId,
-            messageId,
             fileName: file.originalname,
             fileKey,
             fileSize: file.size,
@@ -99,22 +92,11 @@ export class FileDocumentService {
           })
           .returning();
   
-        if (messageId) {
-          await tx.insert(databaseSchema.messageDocument).values({
-            messageId,
-            documentId: doc.id,
-          });
-        }
         return [doc];
       });
   
       return {
         id: document.id,
-        fileName: document.fileName,
-        fileSize: document.fileSize,
-        mimeType: document.mimeType,
-        downloadUrl,
-        textExtracted: !!textContent,
       };
     } catch (error) {
       await this.cloudflareR2Service.deleteFile(fileKey).catch(() => {});
@@ -124,17 +106,15 @@ export class FileDocumentService {
 
   async createMultipleFileDocuments(params: {
     chatId: string;
-    messageId?: string;
     files: Express.Multer.File[];
     extractText?: boolean;
     userId?: string;
   }) {
-    const { chatId, messageId, files, extractText: shouldExtractText = false, userId } = params;
+    const { chatId, files, extractText: shouldExtractText = false, userId } = params;
 
     const createPromises = files.map(file =>
       this.createFileDocument({
         chatId,
-        messageId,
         file,
         extractText: shouldExtractText,
         userId,
@@ -142,109 +122,5 @@ export class FileDocumentService {
     );
 
     return Promise.all(createPromises);
-  }
-
-  async getDownloadUrl(params: GetDownloadUrlParams) {
-    const { documentId, expiresIn = DEFAULT_DOWNLOAD_URL_EXPIRY } = params;
-
-    const [document] = await this.db
-      .select()
-      .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, documentId));
-
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
-
-    return this.cloudflareR2Service.getDownloadUrl({
-      key: document.fileKey,
-      expiresIn,
-    });
-  }
-
-  async getDocumentsByMessageId(messageId: string) {
-    return this.db
-      .select({
-        id: databaseSchema.document.id,
-        fileName: databaseSchema.document.fileName,
-        fileSize: databaseSchema.document.fileSize,
-        mimeType: databaseSchema.document.mimeType,
-        createdAt: databaseSchema.document.createdAt,
-        textExtracted: sql`${databaseSchema.document.text} IS NOT NULL`,
-      })
-      .from(databaseSchema.document)
-      .innerJoin(
-        databaseSchema.messageDocument,
-        eq(databaseSchema.messageDocument.documentId, databaseSchema.document.id),
-      )
-      .where(eq(databaseSchema.messageDocument.messageId, messageId))
-      .orderBy(desc(databaseSchema.document.createdAt));
-  }
-
-  async getDocumentContent(documentId: string) {
-    const [document] = await this.db
-      .select()
-      .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, documentId));
-
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
-
-    const downloadUrl = await this.cloudflareR2Service.getDownloadUrl({
-      key: document.fileKey,
-    });
-
-    return {
-      id: document.id,
-      fileName: document.fileName,
-      fileSize: document.fileSize,
-      mimeType: document.mimeType,
-      text: document.text,
-      downloadUrl,
-      createdAt: document.createdAt,
-    };
-  }
-
-  async getDocumentsByChatId(chatId: string) {
-    return this.db
-      .select()
-      .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.chatId, chatId))
-      .orderBy(desc(databaseSchema.document.createdAt));
-  }
-
-  async deleteDocument(documentId: string) {
-    const [document] = await this.db
-      .select()
-      .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, documentId));
-
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
-
-    await this.cloudflareR2Service.deleteFile(document.fileKey);
-
-    await this.db
-      .delete(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, documentId));
-
-    return { success: true, message: 'Document deleted successfully' };
-  }
-
-  async deleteDocumentsByChatId(chatId: string) {
-    const documents = await this.getDocumentsByChatId(chatId);
-
-    const deletePromises = documents.map(doc =>
-      this.cloudflareR2Service.deleteFile(doc.fileKey),
-    );
-    await Promise.all(deletePromises);
-
-    await this.db
-      .delete(databaseSchema.document)
-      .where(eq(databaseSchema.document.chatId, chatId));
-
-    return { success: true, message: 'All documents deleted successfully' };
   }
 }

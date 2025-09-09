@@ -96,7 +96,14 @@ export class DocumentQueryService {
       .orderBy(desc(databaseSchema.document.createdAt));
   }
 
-  async deleteDocument(id: string) {
+  async getDocumentById(documentId: string) {
+    return this.db
+      .select()
+      .from(databaseSchema.document)
+      .where(eq(databaseSchema.document.id, documentId))
+  }
+
+  async deleteDocumentById(id: string) {
     const [deletedDocument] = await this.db
       .delete(databaseSchema.document)
       .where(eq(databaseSchema.document.id, id))
