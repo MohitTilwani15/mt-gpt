@@ -21,6 +21,4 @@ export class FileUploadResponse {
     mimeType: string;
     downloadUrl: string;
   }>;
-
-  message: string;
 }

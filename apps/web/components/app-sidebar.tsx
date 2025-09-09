@@ -1,8 +1,8 @@
 "use client"
 
-import { Home, MessageSquare, Settings, User, LogOut } from "lucide-react"
+import { Home, MessageSquare, User, LogOut } from "lucide-react"
 import Link from "next/link"
-import { usePathname, redirect, RedirectType } from "next/navigation"
+import { usePathname } from "next/navigation"
 
 import {
   Sidebar,
@@ -15,7 +15,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@workspace/ui/components/sidebar"
 import { authClient } from "@/lib/auth-client"
 
@@ -24,16 +23,6 @@ const items = [
     title: "Home",
     url: "/",
     icon: Home,
-  },
-  {
-    title: "Chat",
-    url: "/chat",
-    icon: MessageSquare,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
   },
 ]
 

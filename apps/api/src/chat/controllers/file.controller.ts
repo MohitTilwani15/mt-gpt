@@ -53,7 +53,6 @@ export class FileController {
         mimeType: file.mimeType,
         downloadUrl: file.downloadUrl,
       })),
-      message: `${files.length} file(s) uploaded successfully`,
     };
   }
 
