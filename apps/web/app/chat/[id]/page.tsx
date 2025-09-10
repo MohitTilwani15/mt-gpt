@@ -26,20 +26,19 @@ interface UploadedFile {
   fileSize: number;
   mimeType: string;
   downloadUrl: string;
-  file: File;
 }
 
 export default function ChatPage() {
   const router = useRouter();
-  const params = useParams();
-  const chatId = params.id as string;
+  const params = useParams<{ id: string }>();
+  const chatId = params.id;
   
   const [text, setText] = useState<string>("");
   const [model, setModel] = useState<string>(DEFAULT_LLM_MODEL!.id);
   const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-
   const [error, setError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, status, setMessages } = useChat({
@@ -144,8 +143,7 @@ export default function ChatPage() {
       } finally {
         setIsFileUploading(false);
       }
-    },
-    [chatId],
+    }, [],
   );
 
   const removeFile = (fileId: string) => {
@@ -156,7 +154,10 @@ export default function ChatPage() {
     event.preventDefault();
 
     if (text.trim() || uploadedFiles.length > 0) {
-      await sendMessage({ text: text.trim(), files: uploadedFiles.map((file) => ({
+      debugger
+      await sendMessage({
+        text: text.trim(),
+        files: uploadedFiles.map((file) => ({
           type: 'file',
           mediaType: file.mimeType,
           url: file.downloadUrl,

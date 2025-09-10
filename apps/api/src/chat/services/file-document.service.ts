@@ -34,7 +34,7 @@ export class FileDocumentService {
   async createFileDocument(params: CreateFileDocumentParams) {
     const { chatId, file, extractText: shouldExtractText = false, userId } = params;
 
-    const { key: fileKey } = await this.cloudflareR2Service.uploadFile({
+    const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
       file,
     });
 
@@ -97,6 +97,10 @@ export class FileDocumentService {
   
       return {
         id: document.id,
+        mimeType: document.mimeType,
+        fileName: document.fileName,
+        fileSize: document.fileSize,
+        downloadUrl
       };
     } catch (error) {
       await this.cloudflareR2Service.deleteFile(fileKey).catch(() => {});

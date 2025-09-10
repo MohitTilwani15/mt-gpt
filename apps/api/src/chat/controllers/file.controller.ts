@@ -40,9 +40,7 @@ export class FileController {
     });
 
     return {
-      files: uploadedFiles.map(file => ({
-        id: file.id,
-      })),
+      files: uploadedFiles,
     };
   }
 }

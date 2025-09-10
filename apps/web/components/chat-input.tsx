@@ -2,6 +2,7 @@
 
 import { useRef, FormEventHandler } from 'react';
 import { PaperclipIcon } from 'lucide-react';
+import { ChatStatus } from 'ai'
 
 import {
   PromptInput,
@@ -27,7 +28,6 @@ interface UploadedFile {
   fileSize: number;
   mimeType: string;
   downloadUrl: string;
-  file: File;
 }
 
 interface ChatInputProps {
@@ -41,7 +41,7 @@ interface ChatInputProps {
   onRemoveFile: (fileId: string) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
   isFileUploading: boolean;
-  status: 'ready' | 'streaming' | 'error' | 'submitted' | 'idle';
+  status: ChatStatus;
   className?: string;
 }
 

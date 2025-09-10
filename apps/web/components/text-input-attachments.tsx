@@ -10,7 +10,6 @@ interface UploadedFile {
   fileSize: number;
   mimeType: string;
   downloadUrl: string;
-  file: File;
 }
 
 interface TextInputAttachmentsProps {
