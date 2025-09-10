@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { BotIcon, FileIcon } from 'lucide-react';
+import { BotIcon } from 'lucide-react';
 import { UIMessage } from 'ai';
 
 import {
@@ -15,25 +15,15 @@ import {
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
-import { formatFileSize } from '../lib/utils';
 
 interface MessageDocument {
   id: string;
-  fileName: string;
-  fileSize: number;
+  fileName?: string;
+  fileSize?: number;
   mimeType: string;
   text?: string;
   downloadUrl: string;
-  createdAt: string;
-}
-
-interface UploadedFile {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  downloadUrl: string;
-  file: File | null;
+  createdAt?: string;
 }
 
 interface MessageListProps {
@@ -82,7 +72,7 @@ export default function MessageList({
                   </div>
 
                   <DocumentAttachments
-                    documents={messageDocuments[message.id] || []}
+                    message={message}
                     onPreview={onDocumentPreview || (() => {})}
                   />
                 </MessageContent>

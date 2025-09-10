@@ -154,13 +154,13 @@ export default function ChatPage() {
     event.preventDefault();
 
     if (text.trim() || uploadedFiles.length > 0) {
-      debugger
       await sendMessage({
         text: text.trim(),
         files: uploadedFiles.map((file) => ({
           type: 'file',
           mediaType: file.mimeType,
           url: file.downloadUrl,
+          filename: file.fileName,
           providerMetadata: {
             file: {
               id: file.id

@@ -59,7 +59,7 @@ export class FileDocumentService {
           console.warn('Failed to extract text from PDF:', error);
         }
       }
-  
+
       const [document] = await this.db.transaction(async (tx) => {
         const existingChat = await tx
           .select()
