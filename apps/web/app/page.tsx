@@ -13,6 +13,7 @@ import ChatHeader from "../components/chat-header";
 import ChatInput from "../components/chat-input";
 import ConversationHistory from "../components/conversation-history";
 import { SUPPORTED_MODELS, DEFAULT_LLM_MODEL } from "../lib/models";
+import { UIMessage, FileUIPart } from "ai";
 
 interface UploadedFile {
   id: string;
@@ -80,19 +81,27 @@ export default function Page() {
     event.preventDefault();
 
     if (text.trim() || uploadedFiles.length > 0) {
-      
-      const initialMessage = {
-        text: text.trim(),
-        files: uploadedFiles.map((file) => ({
-          type: 'file',
-          mediaType: file.mimeType,
-          url: file.downloadUrl,
-          providerMetadata: {
-            file: {
-              id: file.id
-            }
+      const files: FileUIPart[] = uploadedFiles.map((file) => ({
+        type: 'file',
+        mediaType: file.mimeType,
+        url: file.downloadUrl,
+        providerMetadata: {
+          file: {
+            id: file.id
           }
-        }))
+        }
+      }))
+      
+      const initialMessage: UIMessage = {
+        id: uuidv4(),
+        role: 'user',
+        parts: [
+          {
+            type: 'text',
+            text: text.trim()
+          },
+          ...files
+        ]
       };
       
       try {
