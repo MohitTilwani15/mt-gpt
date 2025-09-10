@@ -6,15 +6,14 @@ import {
   useState,
   useCallback,
 } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { useRouter } from "next/navigation";
 
 import ErrorBoundary from "../components/error-boundary";
 import ChatHeader from "../components/chat-header";
-import MessageList from "../components/message-list";
 import ChatInput from "../components/chat-input";
 import ConversationHistory from "../components/conversation-history";
 import { SUPPORTED_MODELS, DEFAULT_LLM_MODEL } from "../lib/models";
+import { UIMessage, FileUIPart } from "ai";
 
 interface UploadedFile {
   id: string;
@@ -26,28 +25,12 @@ interface UploadedFile {
 }
 
 export default function Page() {
-  const [chatId] = useState(() => uuidv4());
+  const router = useRouter();
   const [text, setText] = useState<string>("");
   const [model, setModel] = useState<string>(DEFAULT_LLM_MODEL!.id);
   const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-
-  const { messages, sendMessage, status } = useChat({
-    generateId: () => uuidv4(),
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      prepareSendMessagesRequest({ messages, body }) {
-        return {
-          body: {
-            id: chatId,
-            messages,
-            selectedChatModel: model,
-            ...body,
-          },
-        };
-      },
-    }),
-  });
+  const [chatId] = useState<string>(() => uuidv4());
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
@@ -98,36 +81,91 @@ export default function Page() {
     event.preventDefault();
 
     if (text.trim() || uploadedFiles.length > 0) {
-      setText("");
-      setUploadedFiles([]);
-      await sendMessage({ text: text.trim() });
+      const files: FileUIPart[] = uploadedFiles.map((file) => ({
+        type: 'file',
+        mediaType: file.mimeType,
+        url: file.downloadUrl,
+        providerMetadata: {
+          file: {
+            id: file.id
+          }
+        }
+      }))
+      
+      const initialMessage: UIMessage = {
+        id: uuidv4(),
+        role: 'user',
+        parts: [
+          {
+            type: 'text',
+            text: text.trim()
+          },
+          ...files
+        ]
+      };
+      
+      try {
+        const createChatResponse = await fetch('/api/chat/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            id: chatId
+          }),
+        });
+
+        if (!createChatResponse.ok) {
+          throw new Error('Failed to create chat');
+        }
+        
+        sessionStorage.setItem(`chat-${chatId}`, JSON.stringify(initialMessage));
+        
+        setText("");
+        setUploadedFiles([]);
+        
+        router.push(`/chat/${chatId}`);
+      } catch (error) {
+        console.error('Error creating chat:', error);
+      }
     }
   };
 
   return (
     <ErrorBoundary>
-      <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <div className="flex flex-col h-screen">
         <ChatHeader title="AI Chat">
           <ConversationHistory />
         </ChatHeader>
         
-        <MessageList
-          messages={messages}
-        />
-
-        <ChatInput
-          models={SUPPORTED_MODELS}
-          text={text}
-          setText={setText}
-          model={model}
-          setModel={setModel}
-          isFileUploading={isFileUploading}
-          uploadedFiles={uploadedFiles}
-          onFileUpload={handleFileUpload}
-          onRemoveFile={removeFile}
-          onSubmit={handleChatSubmit}
-          status={status}
-        />
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="w-full max-w-2xl">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold mb-4">Welcome to AI Chat</h1>
+              <p className="text-lg text-muted-foreground">
+                Start a conversation by typing a message below
+              </p>
+            </div>
+            
+            <div className="relative">
+              <ChatInput
+                models={SUPPORTED_MODELS}
+                text={text}
+                setText={setText}
+                model={model}
+                setModel={setModel}
+                isFileUploading={isFileUploading}
+                uploadedFiles={uploadedFiles}
+                onFileUpload={handleFileUpload}
+                onRemoveFile={removeFile}
+                onSubmit={handleChatSubmit}
+                status="ready"
+                className="mx-auto"
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </ErrorBoundary>
   );

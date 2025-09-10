@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { BotIcon, FileIcon } from 'lucide-react';
+import { BotIcon } from 'lucide-react';
 import { UIMessage } from 'ai';
 
 import {
@@ -15,38 +15,24 @@ import {
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
-import { formatFileSize } from '../lib/utils';
 
 interface MessageDocument {
   id: string;
-  fileName: string;
-  fileSize: number;
+  fileName?: string;
+  fileSize?: number;
   mimeType: string;
   text?: string;
   downloadUrl: string;
-  createdAt: string;
-}
-
-interface UploadedFile {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  downloadUrl: string;
-  file: File | null;
+  createdAt?: string;
 }
 
 interface MessageListProps {
   messages: UIMessage[];
-  messageDocuments?: Record<string, MessageDocument[]>;
-  messageAttachments?: Record<string, UploadedFile[]>;
   onDocumentPreview?: (document: MessageDocument) => void;
 }
 
 export default function MessageList({
   messages,
-  messageDocuments = {},
-  messageAttachments = {},
   onDocumentPreview,
 }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,28 +71,8 @@ export default function MessageList({
                     )}
                   </div>
 
-                  {/* Show attachments for messages */}
-                  {messageAttachments[message.id] && messageAttachments[message.id]!.length > 0 && (
-                    <div className="mt-2">
-                      <div className="flex flex-wrap gap-2">
-                        {messageAttachments[message.id]!.map((file) => (
-                          <div
-                            key={file.id}
-                            className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg border max-w-xs"
-                          >
-                            <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{file.fileName}</p>
-                              <p className="text-xs text-muted-foreground">{formatFileSize(file.fileSize)}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   <DocumentAttachments
-                    documents={messageDocuments[message.id] || []}
+                    message={message}
                     onPreview={onDocumentPreview || (() => {})}
                   />
                 </MessageContent>

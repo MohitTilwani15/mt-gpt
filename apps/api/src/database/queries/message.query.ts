@@ -1,11 +1,13 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq, asc, gte, count, inArray } from 'drizzle-orm';
+import { UIMessage } from 'ai';
 
 import { ChatSDKError } from "../../lib/errors";
 import { chat, DBMessage, message } from "../schemas/conversation.schema";
 import { DATABASE_CONNECTION } from '../database-connection';
 import { databaseSchema } from '../schemas';
+import { mapDBPartToUIMessagePart, mapUIMessagePartsToDBParts } from '../../lib/message-mapping'
 
 @Injectable()
 export class MessageQueryService {
@@ -14,87 +16,39 @@ export class MessageQueryService {
     private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
-  async saveMessages({ messages }: { messages: DBMessage[] }) {
-    try {
-      return await this.db.insert(message).values(messages);
-    } catch (error) {
-      throw new ChatSDKError('bad_request:database', 'Failed to save messages');
-    }
-  }
-
-  async getMessagesByChatId({ chatId }: { chatId: string }) {
-    try {
-      return await this.db
-        .select()
-        .from(message)
-        .where(eq(message.chatId, chatId))
-        .orderBy(asc(message.createdAt));
-    } catch (error) {
-      throw new ChatSDKError('bad_request:database', 'Failed to get messages by chat id');
-    }
-  }
-
-  async getMessageById({ id }: { id: string }) {
-    try {
-      return await this.db.select().from(message).where(eq(message.id, id));
-    } catch (error) {
-      throw new ChatSDKError('bad_request:database', 'Failed to get message by id');
-    }
-  }
-
-  async getMessageCountByUserId({
-    id,
-    differenceInHours,
+  async upsertMessage({
+    messageId,
+    chatId,
+    message,
   }: {
-    id: string;
-    differenceInHours: number;
+    messageId: string;
+    chatId: string;
+    message: UIMessage;
   }) {
-    try {
-      const twentyFourHoursAgo = new Date(
-        Date.now() - differenceInHours * 60 * 60 * 1000,
-      );
+    const mappedDBUIParts = mapUIMessagePartsToDBParts(message.parts, messageId);
   
-      const [stats] = await this.db
-        .select({ count: count(message.id) })
-        .from(message)
-        .innerJoin(chat, eq(message.chatId, chat.id))
-        .where(
-          and(
-            eq(chat.userId, id),
-            gte(message.createdAt, twentyFourHoursAgo),
-            eq(message.role, 'user'),
-          ),
-        )
-        .execute();
-  
-      return stats?.count ?? 0;
-    } catch (error) {
-      throw new ChatSDKError(
-        'bad_request:database',
-        'Failed to get message count by user id',
-      );
-    }
-  }
-
-  async voteMessage({ chatId, messageId, type }: { chatId: string, messageId: string, type: 'up' | 'down' }) {
-    return this.db.transaction(async (transaction) => {
-      const isUpvoted = type === 'up';
-      
-      await transaction
-        .insert(databaseSchema.vote)
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(databaseSchema.message)
         .values({
+          id: messageId,
           chatId,
-          messageId,
-          isUpvoted,
+          role: message.role,
         })
         .onConflictDoUpdate({
-          target: [databaseSchema.vote.chatId, databaseSchema.vote.messageId],
+          target: databaseSchema.message.id,
           set: {
-            isUpvoted,
+            chatId,
           },
         });
+  
+      await tx.delete(databaseSchema.parts).where(eq(databaseSchema.parts.messageId, messageId));
+
+      if (mappedDBUIParts.length > 0) {
+        await tx.insert(databaseSchema.parts).values(mappedDBUIParts);
+      }
     });
-  }
+  };
 
   async getMessagesByChatIdPaginated({
     chatId,
@@ -107,87 +61,59 @@ export class MessageQueryService {
     startingAfter?: string | null;
     endingBefore?: string | null;
   }) {
-    try {
-      let whereCondition = eq(message.chatId, chatId);
-
-      if (startingAfter) {
-        const startingMessage = await this.db
-          .select({ createdAt: message.createdAt })
-          .from(message)
-          .where(eq(message.id, startingAfter))
-          .limit(1);
-        
-        if (startingMessage.length > 0) {
-          whereCondition = and(whereCondition, gte(message.createdAt, startingMessage[0].createdAt));
-        }
-      }
-
-      if (endingBefore) {
-        const endingMessage = await this.db
-          .select({ createdAt: message.createdAt })
-          .from(message)
-          .where(eq(message.id, endingBefore))
-          .limit(1);
-        
-        if (endingMessage.length > 0) {
-          whereCondition = and(whereCondition, gte(message.createdAt, endingMessage[0].createdAt));
-        }
-      }
-
-      const messages = await this.db
+    const getMessageById = async (id: string) => {
+      const [row] = await this.db
         .select()
         .from(message)
-        .where(whereCondition)
-        .orderBy(asc(message.createdAt))
-        .limit(limit + 1);
+        .where(eq(message.id, id))
+        .limit(1);
+      return row ?? null;
+    };
+
+    const extendedLimit = limit + 1;
+    let whereCondition = eq(message.chatId, chatId);
+
+    try {
+      if (startingAfter) {
+        const cursorMsg = await getMessageById(startingAfter);
+        if (cursorMsg) {
+          whereCondition = and(whereCondition, gte(message.createdAt, cursorMsg.createdAt));
+        }
+      } else if (endingBefore) {
+        const cursorMsg = await getMessageById(endingBefore);
+        if (cursorMsg) {
+          whereCondition = and(whereCondition, gte(message.createdAt, cursorMsg.createdAt));
+        }
+      }
+
+      const messages = await this.db.query.message.findMany({
+        where: whereCondition,
+        with: {
+          parts: {
+            orderBy: (parts, { asc }) => [asc(parts.order)],
+          },
+        },
+        orderBy: (message, { asc }) => [asc(message.createdAt), asc(message.id)],
+        limit: extendedLimit,
+      });
 
       const hasMore = messages.length > limit;
-      if (hasMore) {
-        messages.pop();
-      }
+      const page = hasMore ? messages.slice(0, limit) : messages;
 
-      // Fetch documents linked to the returned messages using Document.messageId
-      const messageIds = messages.map((m) => m.id);
-      let messageDocuments: Record<string, Array<{
-        id: string;
-        fileName: string;
-        fileSize: number;
-        mimeType: string;
-        createdAt: Date;
-      }>> = {};
+      const mapped = page.map((m) => ({
+        id: m.id,
+        role: m.role,
+        parts: m.parts.map(mapDBPartToUIMessagePart),
+      }));
 
-      if (messageIds.length > 0) {
-        const docs = await this.db
-          .select({
-            messageId: databaseSchema.document.messageId,
-            id: databaseSchema.document.id,
-            fileName: databaseSchema.document.fileName,
-            fileSize: databaseSchema.document.fileSize,
-            mimeType: databaseSchema.document.mimeType,
-            createdAt: databaseSchema.document.createdAt,
-          })
-          .from(databaseSchema.document)
-          .where(inArray(databaseSchema.document.messageId, messageIds));
-
-        messageDocuments = docs.reduce<typeof messageDocuments>((acc, doc) => {
-          if (!doc.messageId) return acc;
-          if (!acc[doc.messageId]) acc[doc.messageId] = [];
-          acc[doc.messageId].push({
-            id: doc.id,
-            fileName: doc.fileName,
-            fileSize: doc.fileSize,
-            mimeType: doc.mimeType,
-            createdAt: doc.createdAt,
-          });
-          return acc;
-        }, {} as typeof messageDocuments);
-      }
+      const firstId = mapped[0]?.id;
+      const lastId = mapped[mapped.length - 1]?.id;
 
       return {
-        messages,
-        messageDocuments,
+        messages: mapped,
         hasMore,
-        nextCursor: hasMore ? messages[messages.length - 1]?.id : null,
+        nextCursor: lastId,
+        prevCursor: firstId,
       };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to get paginated messages by chat id');

@@ -9,7 +9,7 @@ import {
   useCallback,
 } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, UIMessage } from "ai";
 import { useRouter, useParams } from "next/navigation";
 
 import ErrorBoundary from "../../../components/error-boundary";
@@ -26,36 +26,34 @@ interface UploadedFile {
   fileSize: number;
   mimeType: string;
   downloadUrl: string;
-  file: File;
 }
 
 export default function ChatPage() {
   const router = useRouter();
-  const params = useParams();
-  const chatId = params.id as string;
+  const params = useParams<{ id: string }>();
+  const chatId = params.id;
   
   const [text, setText] = useState<string>("");
   const [model, setModel] = useState<string>(DEFAULT_LLM_MODEL!.id);
   const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, status, setMessages } = useChat({
     generateId: () => uuidv4(),
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      prepareSendMessagesRequest({ messages, body }) {
-        return {
-          body: {
-            id: chatId,
-            messages,
-            selectedChatModel: model,
-            ...body,
-          },
-        };
+      prepareSendMessagesRequest({ messages }) {
+        const lastMessage = messages[messages.length - 1];
+          return {
+            body: {
+              id: chatId,
+              selectedChatModel: model,
+              message: lastMessage,
+            },
+          };
       },
     }),
   });
@@ -71,43 +69,41 @@ export default function ChatPage() {
   useEffect(() => {
     const loadChat = async () => {
       try {
-        setIsLoading(true);
         setError(null);
 
-        const messagesResponse = await fetch(`/api/chat/${chatId}/messages?limit=100`, {
-          credentials: "include",
-        });
-
-        if (!messagesResponse.ok) {
-          if (messagesResponse.status === 404) {
-            router.push("/");
-            return;
-          }
-          throw new Error("Failed to load chat");
-        }
-
-        const data = await messagesResponse.json();
+        const initialMessageData = sessionStorage.getItem(`chat-${chatId}`);
         
-        const transformedMessages = data.messages.map((msg: any) => ({
-          id: msg.id,
-          role: msg.role,
-          parts: msg.parts || [{ type: "text", text: msg.content || "" }],
-          createdAt: new Date(msg.createdAt),
-        }));
+        if (initialMessageData) {
+          const initialMessage: UIMessage = JSON.parse(initialMessageData);
+          sessionStorage.removeItem(`chat-${chatId}`);
+          await sendMessage(initialMessage)
+        } else {
+          const messagesResponse = await fetch(`/api/chat/${chatId}/messages?limit=100`, {
+            credentials: "include",
+          });
 
-        setMessages(transformedMessages);
+          if (!messagesResponse.ok) {
+            if (messagesResponse.status === 404) {
+              router.push("/");
+              return;
+            }
+            throw new Error("Failed to load chat");
+          }
+
+          const { messages }: { messages: UIMessage[] } = await messagesResponse.json();
+
+          setMessages(messages);
+        }
       } catch (err) {
         console.error("Error loading chat:", err);
         setError(err instanceof Error ? err.message : "Failed to load chat");
-      } finally {
-        setIsLoading(false);
       }
     };
 
     if (chatId) {
       loadChat();
     }
-  }, [chatId, router, setMessages]);
+  }, []);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
@@ -147,8 +143,7 @@ export default function ChatPage() {
       } finally {
         setIsFileUploading(false);
       }
-    },
-    [chatId],
+    }, [],
   );
 
   const removeFile = (fileId: string) => {
@@ -159,10 +154,13 @@ export default function ChatPage() {
     event.preventDefault();
 
     if (text.trim() || uploadedFiles.length > 0) {
-      await sendMessage({ text: text.trim(), files: uploadedFiles.map((file) => ({
+      await sendMessage({
+        text: text.trim(),
+        files: uploadedFiles.map((file) => ({
           type: 'file',
           mediaType: file.mimeType,
           url: file.downloadUrl,
+          filename: file.fileName,
           providerMetadata: {
             file: {
               id: file.id
@@ -178,17 +176,6 @@ export default function ChatPage() {
   const handleBack = () => {
     router.push("/");
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading chat...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (

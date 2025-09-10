@@ -6,11 +6,13 @@ import {
   createUIMessageStream,
   stepCountIs,
   smoothStream,
+  convertToModelMessages,
+  UIMessage,
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, asc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
@@ -24,6 +26,8 @@ import {
 import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
+import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
+import { DBMessage } from '../database/schemas/conversation.schema'
 
 @Injectable()
 export class ChatService {
@@ -36,7 +40,7 @@ export class ChatService {
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
-    const { id, messages, selectedChatModel, documentIds } = requestBody;
+    const { id, message, selectedChatModel } = requestBody;
 
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
@@ -44,72 +48,42 @@ export class ChatService {
     }
 
     return this.db.transaction(async (transaction) => {
-      if (!existingChat) {
+      if (existingChat && !existingChat.title) {
         const title = await this.generateTitleFromUserMessage(
-          messages[messages.length - 1].parts
+          message.parts
+            .filter((part) => part.type === 'text')
             .map((part) => part.text)
             .join(' '),
         );
 
-        await transaction.insert(databaseSchema.chat).values({
-          id,
-          createdAt: new Date(),
-          userId: session.user.id,
-          title,
-        });
+        await transaction.update(databaseSchema.chat)
+          .set({ title })
+          .where(eq(databaseSchema.chat.id, id));
       }
 
-      const existingMessage = await transaction
-        .select()
-        .from(databaseSchema.message)
-        .where(eq(databaseSchema.message.id, messages[messages.length - 1].id))
-        .limit(1);
+      await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message })
 
-      if (!existingMessage.length) {
-        const messageInsert = await transaction
-          .insert(databaseSchema.message)
-          .values({
-            chatId: id,
-            id: messages[messages.length - 1].id,
-            role: 'user',
-            parts: messages[messages.length - 1].parts,
-            attachments: [],
-            createdAt: new Date(),
-          })
-          .returning();
-
-        const insertedMessageId = messageInsert[0].id;
-
-        if (documentIds && documentIds.length > 0) {
-          const linkPromises = documentIds.map((documentId) =>
-            transaction.insert(databaseSchema.messageDocument).values({
-              messageId: insertedMessageId,
-              documentId,
-            }),
-          );
-          await Promise.all(linkPromises);
-        }
-      }
-
-      const streamId = uuidv4();
-      await transaction.insert(databaseSchema.stream).values({
-        id: streamId,
-        chatId: id,
-        createdAt: new Date(),
+      const messages = await transaction.query.message.findMany({
+        where: eq(databaseSchema.message.chatId, existingChat.id),
+        with: {
+          parts: {
+            orderBy: (parts, { asc }) => [asc(parts.order)],
+          },
+        },
+        orderBy: (messages, { asc }) => [asc(messages.createdAt)],
       });
-
-      const messagesFromDb = await transaction
-        .select()
-        .from(databaseSchema.message)
-        .where(eq(databaseSchema.message.chatId, id))
-        .orderBy(asc(databaseSchema.message.createdAt));
-
-      const uiMessages = [this.convertToUIMessages(messagesFromDb)];
+    
+      const messages1 = messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
+      }));
 
       return this.generateAIResponse({
         chatId: id,
-        messages: uiMessages,
+        messages: messages1,
         selectedChatModel,
+        message
       });
     });
   }
@@ -126,6 +100,21 @@ export class ChatService {
     });
   }
 
+  async createNewChat(chatId: string, session: UserSession) {
+    await this.chatQueryService.createChat({
+      id: chatId,
+      userId: session.user.id,
+      title: 'New Chat',
+    });
+
+    return {
+      id: chatId,
+      title: 'New Chat',
+      userId: session.user.id,
+      createdAt: new Date(),
+    };
+  }
+
   async getChatById(chatId: string, session: UserSession) {
     const chat = await this.chatQueryService.getChatById({ id: chatId });
 
@@ -140,83 +129,24 @@ export class ChatService {
     return chat;
   }
 
-  async deleteChat(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:chat');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:chat');
-    }
-
-    return this.chatQueryService.deleteChatById({ id: chatId });
-  }
-
-  async getChatStream(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:chat');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:chat');
-    }
-
-    const messages = await this.messageQueryService.getMessagesByChatId({
-      chatId,
-    });
-
-    if (!messages.length) {
-      throw new ChatSDKError('not_found:stream');
-    }
-
-    const stream = createUIMessageStream({
-      execute: ({ writer: dataStream }) => {
-        messages.forEach((message) => {
-          dataStream.write({
-            type: 'data-message',
-            data: {
-              id: message.id,
-              role: message.role,
-              parts: message.parts,
-              attachments: message.attachments,
-            },
-          });
-        });
-
-        dataStream.write({
-          type: 'finish',
-        });
-      },
-      generateId: uuidv4,
-      onFinish: async () => {},
-      onError: () => {
-        return 'Oops, an error occurred!';
-      },
-    });
-
-    return stream;
-  }
-
   private async generateAIResponse({
     chatId,
     messages,
     selectedChatModel,
+    message
   }: {
     chatId: string;
-    messages: any[];
+    messages: UIMessage[];
     selectedChatModel: ChatModel;
+    message: UIMessage;
   }) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         let contextPrompt = '';
-        const lastUserMessage = messages[messages.length - 1];
+        const lastMessage = messages[messages.length - 1];
 
-        if (lastUserMessage && lastUserMessage.role === 'user') {
-          const userQuery = lastUserMessage.parts
+        if (lastMessage && lastMessage.role === 'user') {
+          const userQuery = lastMessage.parts
             .map((part: any) => part.text)
             .join(' ');
 
@@ -244,7 +174,7 @@ export class ChatService {
         const result = streamText({
           model: openai(selectedChatModel || 'gpt-4o'),
           system: this.getSystemPrompt() + contextPrompt,
-          messages: this.convertToModelMessages(messages),
+          messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),
         });
@@ -258,17 +188,8 @@ export class ChatService {
         );
       },
       generateId: uuidv4,
-      onFinish: async ({ messages }) => {
-        await this.messageQueryService.saveMessages({
-          messages: messages.map((message) => ({
-            id: message.id,
-            role: message.role,
-            parts: message.parts,
-            createdAt: new Date(),
-            attachments: [],
-            chatId,
-          })),
-        });
+      onFinish: async ({ responseMessage }) => {
+        await this.messageQueryService.upsertMessage({ messageId: responseMessage.id, chatId, message: responseMessage })
       },
       onError: () => {
         return 'Oops, an error occurred!';
@@ -292,61 +213,8 @@ export class ChatService {
     return title;
   }
 
-  private convertToUIMessages(messages: any[]): any[] {
-    return messages.map((msg) => ({
-      id: msg.id,
-      role: msg.role,
-      parts: msg.parts,
-      attachments: msg.attachments,
-    }));
-  }
-
-  private convertToModelMessages(messages: any[]): any[] {
-    return messages.map((msg) => ({
-      role: msg.role,
-      content: msg.parts.map((part: any) => part.text).join(''),
-    }));
-  }
-
   private getSystemPrompt(): string {
     return `You are a helpful AI assistant. Please provide clear and helpful responses.`;
-  }
-
-  async getVotesByChatId(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:chat');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:vote');
-    }
-
-    return this.chatQueryService.getVotesByChatId({ chatId });
-  }
-
-  async voteMessage(
-    chatId: string,
-    messageId: string,
-    type: 'up' | 'down',
-    session: UserSession,
-  ) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
-
-    if (!chat) {
-      throw new ChatSDKError('not_found:vote');
-    }
-
-    if (chat.userId !== session.user.id) {
-      throw new ChatSDKError('forbidden:vote');
-    }
-
-    await this.messageQueryService.voteMessage({
-      chatId,
-      messageId,
-      type,
-    });
   }
 
   async getMessagesByChatId(

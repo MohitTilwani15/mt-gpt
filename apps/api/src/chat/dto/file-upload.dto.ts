@@ -16,9 +16,5 @@ export class UploadFilesDto {
 export class FileUploadResponse {
   files: Array<{
     id: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    downloadUrl: string;
   }>;
 }

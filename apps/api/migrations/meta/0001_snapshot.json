@@ -1,6 +1,6 @@
 {
-  "id": "a76fa7f4-7f32-4088-8650-9883e9c0e75a",
-  "prevId": "6f6f8d36-008b-464a-9e65-4a24d9e83d21",
+  "id": "ff7e5a4b-5186-4462-8724-5191be2e3ec2",
+  "prevId": "159a8e0e-2e94-4cd9-9f07-a27ec0dc0f8b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -326,7 +326,8 @@
           "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "title": {
           "name": "title",
@@ -363,6 +364,107 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.Document": {
+      "name": "Document",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "chatId": {
+          "name": "chatId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "messageId": {
+          "name": "messageId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fileName": {
+          "name": "fileName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fileKey": {
+          "name": "fileKey",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fileSize": {
+          "name": "fileSize",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mimeType": {
+          "name": "mimeType",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "embedding": {
+          "name": "embedding",
+          "type": "vector(1536)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Document_chatId_Chat_id_fk": {
+          "name": "Document_chatId_Chat_id_fk",
+          "tableFrom": "Document",
+          "tableTo": "Chat",
+          "columnsFrom": [
+            "chatId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "Document_messageId_Message_id_fk": {
+          "name": "Document_messageId_Message_id_fk",
+          "tableFrom": "Document",
+          "tableTo": "Message",
+          "columnsFrom": [
+            "messageId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.Message": {
       "name": "Message",
       "schema": "",
@@ -386,26 +488,52 @@
           "primaryKey": false,
           "notNull": true
         },
-        "parts": {
-          "name": "parts",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attachments": {
-          "name": "attachments",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": true
-        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "messages_chat_id_idx": {
+          "name": "messages_chat_id_idx",
+          "columns": [
+            {
+              "expression": "chatId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "messages_chat_id_created_at_idx": {
+          "name": "messages_chat_id_created_at_idx",
+          "columns": [
+            {
+              "expression": "chatId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "Message_chatId_Chat_id_fk": {
           "name": "Message_chatId_Chat_id_fk",
@@ -417,7 +545,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -425,6 +553,202 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parts": {
+      "name": "parts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "messageId": {
+          "name": "messageId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "text_text": {
+          "name": "text_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reasoning_text": {
+          "name": "reasoning_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_mediaType": {
+          "name": "file_mediaType",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_filename": {
+          "name": "file_filename",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_url_sourceId": {
+          "name": "source_url_sourceId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_url_url": {
+          "name": "source_url_url",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_url_title": {
+          "name": "source_url_title",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_document_sourceId": {
+          "name": "source_document_sourceId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_document_mediaType": {
+          "name": "source_document_mediaType",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_document_title": {
+          "name": "source_document_title",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_document_filename": {
+          "name": "source_document_filename",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerMetadata": {
+          "name": "providerMetadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "parts_message_id_idx": {
+          "name": "parts_message_id_idx",
+          "columns": [
+            {
+              "expression": "messageId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "parts_message_id_order_idx": {
+          "name": "parts_message_id_order_idx",
+          "columns": [
+            {
+              "expression": "messageId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "parts_messageId_Message_id_fk": {
+          "name": "parts_messageId_Message_id_fk",
+          "tableFrom": "parts",
+          "tableTo": "Message",
+          "columnsFrom": [
+            "messageId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "text_text_required_if_type_is_text": {
+          "name": "text_text_required_if_type_is_text",
+          "value": "CASE WHEN \"parts\".\"type\" = 'text' THEN \"parts\".\"text_text\" IS NOT NULL ELSE TRUE END"
+        },
+        "reasoning_text_required_if_type_is_reasoning": {
+          "name": "reasoning_text_required_if_type_is_reasoning",
+          "value": "CASE WHEN \"parts\".\"type\" = 'reasoning' THEN \"parts\".\"reasoning_text\" IS NOT NULL ELSE TRUE END"
+        },
+        "file_fields_required_if_type_is_file": {
+          "name": "file_fields_required_if_type_is_file",
+          "value": "CASE WHEN \"parts\".\"type\" = 'file' THEN \"parts\".\"file_mediaType\" IS NOT NULL AND \"parts\".\"file_url\" IS NOT NULL ELSE TRUE END"
+        },
+        "source_url_fields_required_if_type_is_source_url": {
+          "name": "source_url_fields_required_if_type_is_source_url",
+          "value": "CASE WHEN \"parts\".\"type\" = 'source_url' THEN \"parts\".\"source_url_sourceId\" IS NOT NULL AND \"parts\".\"source_url_url\" IS NOT NULL ELSE TRUE END"
+        },
+        "source_document_fields_required_if_type_is_source_document": {
+          "name": "source_document_fields_required_if_type_is_source_document",
+          "value": "CASE WHEN \"parts\".\"type\" = 'source_document' THEN \"parts\".\"source_document_sourceId\" IS NOT NULL AND \"parts\".\"source_document_mediaType\" IS NOT NULL AND \"parts\".\"source_document_title\" IS NOT NULL ELSE TRUE END"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.Vote": {
@@ -462,7 +786,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "Vote_messageId_Message_id_fk": {
@@ -475,7 +799,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

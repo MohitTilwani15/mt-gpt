@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1757085188612,
-      "tag": "0000_common_bushwacker",
+      "when": 1757436584546,
+      "tag": "0000_enable-pgvector-extension",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1757086418999,
-      "tag": "0001_silky_jamie_braddock",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1757100234046,
-      "tag": "0002_breezy_hellion",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1757274176527,
-      "tag": "0003_enable-pgvector-extension",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1757329065710,
-      "tag": "0004_quick_vindicator",
+      "when": 1757436595510,
+      "tag": "0001_groovy_marten_broadcloak",
       "breakpoints": true
     }
   ]

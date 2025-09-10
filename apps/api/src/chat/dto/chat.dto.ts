@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsArray, IsEnum, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UIMessage } from 'ai';
 
 export enum ChatModel {
   GPT_4O = 'gpt-4o',
@@ -34,16 +35,10 @@ export class PostChatRequestDto {
   @IsUUID()
   id: string;
 
-  @Type(() => ChatMessage)
-  messages: ChatMessage[];
+  message: UIMessage;
 
   @IsEnum(ChatModel)
   selectedChatModel: ChatModel;
-
-  @IsOptional()
-  @IsArray()
-  @IsUUID('4', { each: true })
-  documentIds?: string[];
 }
 
 export class GetChatsQueryDto {
