@@ -3,6 +3,7 @@ import { text } from "drizzle-orm/pg-core";
 import { InferSelectModel, sql } from "drizzle-orm";
 import { relations } from "drizzle-orm";
 import { UIMessage } from "ai";
+import type { LanguageModelV2Usage } from "@ai-sdk/provider";
 
 import { user } from "./auth.schema";
 import { MyProviderMetadata } from '../../lib/message-type'
@@ -14,6 +15,7 @@ export const chat = pgTable('Chat', {
   userId: text('userId')
     .notNull()
     .references(() => user.id),
+  lastContext: jsonb('lastContext').$type<LanguageModelV2Usage | null>(),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

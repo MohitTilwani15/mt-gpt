@@ -1,0 +1,2 @@
+ALTER TABLE "Chat" ALTER COLUMN "title" DROP NOT NULL;
+ALTER TABLE "Chat" ADD COLUMN "lastContext" jsonb;

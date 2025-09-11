@@ -15,6 +15,13 @@
       "when": 1757436595510,
       "tag": "0001_groovy_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1757626066892,
+      "tag": "0002_free_lightspeed",
+      "breakpoints": true
     }
   ]
 }

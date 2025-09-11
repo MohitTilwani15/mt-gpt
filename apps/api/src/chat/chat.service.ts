@@ -8,6 +8,7 @@ import {
   smoothStream,
   convertToModelMessages,
   UIMessage,
+  LanguageModelUsage,
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { xai } from '@ai-sdk/xai';
@@ -143,6 +144,8 @@ export class ChatService {
     selectedChatModel: ChatModel;
     message: UIMessage;
   }) {
+    let finalUsage: LanguageModelUsage | undefined;
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         // TODO: Check how below could be improved
@@ -199,6 +202,10 @@ export class ChatService {
             xai: {
               reasoningEffort: 'high',
             }
+          },
+          onFinish: ({ usage }) => {
+            finalUsage = usage
+            dataStream.write({ type: 'data-usage', data: usage });
           }
         });
 
@@ -214,6 +221,17 @@ export class ChatService {
       generateId: uuidv4,
       onFinish: async ({ responseMessage }) => {
         await this.messageQueryService.upsertMessage({ messageId: responseMessage.id, chatId, message: responseMessage })
+
+        if (finalUsage) {
+          try {
+            await this.chatQueryService.updateChatLastContextById({
+              chatId,
+              context: finalUsage,
+            });
+          } catch (err) {
+            console.warn('Unable to persist last usage for chat', chatId, err);
+          }
+        }
       },
       onError: (error) => {
         console.error('error while streaming response', error)

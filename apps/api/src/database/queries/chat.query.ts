@@ -1,6 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, gt, lt, SQL } from 'drizzle-orm';
+import { LanguageModelV2Usage } from '@ai-sdk/provider';
 
 import { ChatSDKError } from "../../lib/errors";
 import { Chat, chat } from "../schemas/conversation.schema";
@@ -117,6 +118,24 @@ export class ChatQueryService {
       return selectedChat;
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to get chat by id');
+    }
+  }
+
+  async updateChatLastContextById({
+    chatId,
+    context,
+  }: {
+    chatId: string;
+    context: LanguageModelV2Usage;
+  }) {
+    try {
+      return await this.db
+        .update(chat)
+        .set({ lastContext: context })
+        .where(eq(chat.id, chatId));
+    } catch (error) {
+      console.warn('Failed to update lastContext for chat', chatId, error);
+      return;
     }
   }
 }

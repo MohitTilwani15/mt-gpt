@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.28",
+    "@ai-sdk/provider": "^2.0.0",
     "@ai-sdk/xai": "^2.0.16",
     "@aws-sdk/client-s3": "^3.887.0",
     "@aws-sdk/s3-request-presigner": "^3.887.0",
