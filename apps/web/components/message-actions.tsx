@@ -1,0 +1,153 @@
+'use client';
+
+import { useCopyToClipboard } from 'usehooks-ts';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { CopyIcon, ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon } from 'lucide-react';
+import { Button } from '@workspace/ui/components/button';
+import { UIMessage, ChatStatus } from 'ai';
+import { updateVote } from '@/lib/hooks/use-votes';
+
+interface MessageActionsProps {
+  chatId: string;
+  message: UIMessage;
+  vote?: { isUpvoted: boolean } | null;
+  isLoading?: boolean;
+  status?: ChatStatus;
+  onRegenerate?: () => void;
+  className?: string;
+}
+
+export function MessageActions({
+  chatId,
+  message,
+  vote,
+  isLoading = false,
+  status,
+  onRegenerate,
+  className = '',
+}: MessageActionsProps) {
+  const [_, copyToClipboard] = useCopyToClipboard();
+  const [isVoting, setIsVoting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  // Don't show actions while loading
+  if (isLoading) {
+    return null;
+  }
+
+  // Extract text from message parts
+  const textFromParts = message.parts
+    ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n')
+    .trim();
+
+  const handleCopy = async () => {
+    if (!textFromParts) {
+      toast.error("There's no text to copy!");
+      return;
+    }
+
+    try {
+      await copyToClipboard(textFromParts);
+      toast.success('Copied to clipboard!');
+    } catch (error) {
+      toast.error('Failed to copy to clipboard');
+    }
+  };
+
+  const handleVote = async (type: 'up' | 'down') => {
+    if (isVoting) return;
+
+    setIsVoting(true);
+    
+    try {
+      await updateVote({
+        chatId,
+        messageId: message.id,
+        type,
+      });
+
+      toast.success(type === 'up' ? 'Upvoted!' : 'Downvoted!');
+    } catch (error) {
+      toast.error('Failed to vote');
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (isRegenerating || !onRegenerate) return;
+
+    setIsRegenerating(true);
+    
+    try {
+      await onRegenerate();
+      toast.success('Regenerating response...');
+    } catch (error) {
+      toast.error('Failed to regenerate response');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  // Only show regenerate if the message is the last assistant message and not currently streaming
+  const showRegenerate = onRegenerate && status !== 'streaming' && message.role === 'assistant';
+
+  // Only show vote buttons for assistant messages
+  const showVoteButtons = message.role === 'assistant';
+
+  return (
+    <div className={`flex items-center gap-1 ${className}`}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+        onClick={handleCopy}
+        title={message.role === 'user' ? "Copy your message" : "Copy response"}
+      >
+        <CopyIcon className="h-4 w-4" />
+      </Button>
+
+      {showRegenerate && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+          onClick={handleRegenerate}
+          disabled={isRegenerating}
+          title="Regenerate response"
+        >
+          <RefreshCwIcon className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+        </Button>
+      )}
+
+      {showVoteButtons && (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+            onClick={() => handleVote('up')}
+            disabled={isVoting || vote?.isUpvoted}
+            title={vote?.isUpvoted ? 'Already upvoted' : 'Upvote response'}
+          >
+            <ThumbsUpIcon className={`h-4 w-4 ${vote?.isUpvoted ? 'fill-current text-green-500' : ''}`} />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+            onClick={() => handleVote('down')}
+            disabled={isVoting || !!(vote && !vote.isUpvoted)}
+            title={vote && !vote.isUpvoted ? 'Already downvoted' : 'Downvote response'}
+          >
+            <ThumbsDownIcon className={`h-4 w-4 ${vote && !vote.isUpvoted ? 'fill-current text-red-500' : ''}`} />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}

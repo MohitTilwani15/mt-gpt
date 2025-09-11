@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { HistoryIcon, XIcon } from 'lucide-react';
+import { useChats } from '@/lib/hooks/use-chat';
 import {
   Sheet,
   SheetContent,
@@ -25,40 +26,14 @@ interface ConversationHistoryProps {
 }
 
 export default function ConversationHistory({ trigger, onChatSelect }: ConversationHistoryProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
-  const fetchConversations = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await fetch('/api/chat?limit=50', {
-        credentials: 'include',
-      });
+  const { data: chatsData, isLoading, error, mutate } = useChats(50, undefined, undefined, {
+    refreshInterval: 0,
+  });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch conversations');
-      }
-
-      const data = await response.json();
-      setConversations(data.chats || []);
-    } catch (err) {
-      console.error('Error fetching conversations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchConversations();
-    }
-  }, [isOpen]);
+  const conversations = chatsData?.chats || [];
 
   const handleChatSelect = (chatId: string) => {
     if (onChatSelect) {
@@ -114,7 +89,7 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
           ) : error ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">{error}</p>
-              <Button onClick={fetchConversations} variant="outline" size="sm">
+              <Button onClick={() => mutate()} variant="outline" size="sm">
                 Retry
               </Button>
             </div>

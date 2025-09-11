@@ -17,7 +17,7 @@ import ChatHeader from "@/components/chat-header";
 import MessageList from "@/components/message-list";
 import ChatInput from "@/components/chat-input";
 import ConversationHistory from "@/components/conversation-history";
-import { useSupportedModels } from "@/lib/use-models";
+import { useSelectedModel, useFileUpload } from "@/lib/hooks/index";
 import { Button } from "@workspace/ui/components/button";
 
 interface UploadedFile {
@@ -34,13 +34,16 @@ export default function ChatPage() {
   const chatId = params.id;
   
   const [text, setText] = useState<string>("");
-  const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { isUploading: isFileUploading, uploadFiles, clearError: clearFileUploadError } = useFileUpload();
   
-  const { data: modelsData } = useSupportedModels();
-  const supportedModels = modelsData?.models || [];
-  const [selectedModel, setSelectedModel] = useState<string>(modelsData?.defaultModel || "");
+  const {
+    selectedModel,
+    setSelectedModel,
+    availableModels: supportedModels,
+    isLoading: isLoadingModels
+  } = useSelectedModel();
 
   const selectedModelRef = useRef<string>(selectedModel);
   useEffect(() => {
@@ -74,16 +77,11 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    if (modelsData?.defaultModel && !selectedModel) {
-      setSelectedModel(modelsData.defaultModel);
-    }
-  }, [modelsData, selectedModel]);
-
+  
   useEffect(() => {
     const loadChat = async () => {
       try {
-        if (!modelsData) return;
+        if (isLoadingModels) return;
 
         setError(null);
 
@@ -119,47 +117,27 @@ export default function ChatPage() {
     if (chatId) {
       loadChat();
     }
-  }, [modelsData]);
+  }, [isLoadingModels]);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
-      const formData = new FormData();
-      const fileArray = Array.from(files);
-
-      fileArray.forEach((file) => {
-        formData.append("files", file);
-      });
-
-      formData.append("chatId", chatId);
-      formData.append("extractText", "true");
-
       try {
-        setIsFileUploading(true);
-        const response = await fetch("/api/files/upload", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
+        const data = await uploadFiles(files, {
+          chatId,
+          extractText: true,
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
 
         const newFiles = data.files.map((file: any) => ({
           ...file,
-          file: fileArray.find((f) => f.name === file.fileName),
+          file: Array.from(files).find((f) => f.name === file.fileName),
         }));
 
         setUploadedFiles((prev) => [...prev, ...newFiles]);
       } catch (error) {
         console.error("Error uploading files:", error);
-      } finally {
-        setIsFileUploading(false);
       }
-    }, [],
+    },
+    [uploadFiles, chatId],
   );
 
   const removeFile = (fileId: string) => {
@@ -198,6 +176,21 @@ export default function ChatPage() {
     router.push("/");
   };
 
+  const handleRegenerate = async () => {
+    if (messages.length === 0) return;
+    
+    const lastUserMessage = messages
+      .filter(msg => msg.role === 'user')
+      .pop();
+    
+    if (!lastUserMessage) return;
+    
+    const newMessages = messages.slice(0, -1);
+    setMessages(newMessages);
+    
+    await sendMessage(lastUserMessage);
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -220,6 +213,8 @@ export default function ChatPage() {
         <MessageList
           messages={messages}
           status={status}
+          chatId={chatId}
+          onRegenerate={handleRegenerate}
         />
 
         <ChatInput

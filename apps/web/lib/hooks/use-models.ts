@@ -1,5 +1,9 @@
 import useSWR from 'swr';
-import { ChatModel } from './models';
+
+export interface ChatModel {
+  id: string;
+  name: string;
+}
 
 export interface ModelsResponse {
   models: ChatModel[];
@@ -19,12 +23,5 @@ const fetchSupportedModels = async (): Promise<ModelsResponse> => {
 };
 
 export const useSupportedModels = () => {
-  return useSWR<ModelsResponse>('/api/chat/models', fetchSupportedModels, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    shouldRetryOnError: false,
-    dedupingInterval: 60000, // Dedupe requests within 60 seconds
-    errorRetryCount: 0,
-    refreshInterval: 0,
-  });
+  return useSWR<ModelsResponse>('/api/chat/models', fetchSupportedModels);
 };

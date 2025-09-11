@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BotIcon } from 'lucide-react';
 import { ChatStatus, UIMessage } from 'ai';
+import { useVotes, getVoteForMessage } from '@/lib/hooks/use-votes';
 
 import {
   Message,
@@ -14,6 +15,7 @@ import {
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import { MessageReasoning } from './message-reasoning';
+import { MessageActions } from './message-actions';
 import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
 import DocumentPreview from './document-preview';
@@ -30,14 +32,20 @@ interface MessageDocument {
 
 interface MessageListProps {
   messages: UIMessage[];
-  status: ChatStatus
+  status: ChatStatus;
+  chatId: string;
+  onRegenerate?: () => void;
 }
 
-export default function MessageList({ messages, status }: MessageListProps) {
+
+export default function MessageList({ messages, status, chatId, onRegenerate }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [previewDocument, setPreviewDocument] = useState<MessageDocument | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  const { data: votes } = useVotes(chatId);
+
+  
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -73,10 +81,11 @@ export default function MessageList({ messages, status }: MessageListProps) {
             </div>
           ) : (
             messages.map((message) => (
-              <Message key={message.id} from={message.role}>
+              <Message key={message.id} from={message.role} className="group/message">
                 <MessageContent>
-                  <div>
-                    {message.parts.map((part, index) => {
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      {message.parts.map((part, index) => {
                       const { type } = part;
                       const key = `message-${message.id}-part-${index}`;
 
@@ -98,6 +107,18 @@ export default function MessageList({ messages, status }: MessageListProps) {
                       }
                       return null;
                     })}
+                    </div>
+                    
+                    <div className="flex-shrink-0 ml-2">
+                      <MessageActions
+                        chatId={chatId}
+                        message={message}
+                        vote={getVoteForMessage(votes, message.id)}
+                        isLoading={status === 'streaming'}
+                        status={status}
+                        onRegenerate={onRegenerate}
+                      />
+                    </div>
                   </div>
 
                   <DocumentAttachments

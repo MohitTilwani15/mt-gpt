@@ -5,8 +5,6 @@ import {
   FormEventHandler,
   useState,
   useCallback,
-  useEffect,
-  useRef,
 } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,7 +12,7 @@ import ErrorBoundary from "@/components/error-boundary";
 import ChatHeader from "@/components/chat-header";
 import ChatInput from "@/components/chat-input";
 import ConversationHistory from "@/components/conversation-history";
-import { useSupportedModels } from "@/lib/use-models";
+import { useSelectedModel, createChat, useFileUpload } from "@/lib/hooks/index";
 import { UIMessage, FileUIPart } from "ai";
 
 interface UploadedFile {
@@ -29,59 +27,34 @@ interface UploadedFile {
 export default function Page() {
   const router = useRouter();
   const [text, setText] = useState<string>("");
-  const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [chatId] = useState<string>(() => uuidv4());
+  const { isUploading: isFileUploading, uploadFiles } = useFileUpload();
   
-  const { data: modelsData, error: modelsError } = useSupportedModels();
-  const supportedModels = modelsData?.models || [];
-  const [selectedModel, setSelectedModel] = useState<string>(modelsData?.defaultModel || "");
-
-  useEffect(() => {
-    if (modelsData?.defaultModel && !selectedModel) {
-      setSelectedModel(modelsData.defaultModel);
-    }
-  }, [modelsData, selectedModel]);
+  const {
+    selectedModel,
+    setSelectedModel,
+    availableModels: supportedModels,
+    isLoading: isLoadingModels
+  } = useSelectedModel();
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
-      const formData = new FormData();
-      const fileArray = Array.from(files);
-
-      fileArray.forEach((file) => {
-        formData.append("files", file);
-      });
-
-      formData.append("chatId", chatId);
-      formData.append("extractText", "true");
-
       try {
-        setIsFileUploading(true);
-
-        const response = await fetch("/api/files/upload", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
+        const data = await uploadFiles(files, {
+          chatId,
+          extractText: true,
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
         const newFiles = data.files.map((file: any) => ({
           ...file,
-          file: fileArray.find((f) => f.name === file.fileName),
+          file: Array.from(files).find((f) => f.name === file.fileName),
         }));
 
         setUploadedFiles((prev) => [...prev, ...newFiles]);
       } catch (error) {
         console.error("Error uploading files:", error);
-      } finally {
-        setIsFileUploading(false);
       }
-    }, [chatId],
+    }, [uploadFiles, chatId],
   );
 
   const removeFile = (fileId: string) => {
@@ -91,7 +64,7 @@ export default function Page() {
   const handleChatSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
 
-    if (modelsError) return;
+    if (isLoadingModels) return;
 
     if (!selectedModel && supportedModels.length > 0) return;
 
@@ -120,20 +93,9 @@ export default function Page() {
       };
       
       try {
-        const createChatResponse = await fetch('/api/chat/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            id: chatId
-          }),
+        await createChat({
+          id: chatId
         });
-
-        if (!createChatResponse.ok) {
-          throw new Error('Failed to create chat');
-        }
         
         sessionStorage.setItem(`chat-${chatId}`, JSON.stringify(initialMessage));
         
@@ -147,25 +109,7 @@ export default function Page() {
     }
   };
 
-  if (modelsError) {
-    return (
-      <ErrorBoundary>
-        <div className="flex flex-col h-screen">
-          <ChatHeader title="AI Chat">
-            <ConversationHistory />
-          </ChatHeader>
-          
-          <div className="flex-1 flex items-center justify-center px-4">
-            <div className="text-center max-w-md">
-              <h2 className="text-xl font-semibold mb-2">Error</h2>
-              <p className="text-muted-foreground mb-4">Failed to load available models. Please refresh the page.</p>
-            </div>
-          </div>
-        </div>
-      </ErrorBoundary>
-    );
-  }
-
+  
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-screen">
