@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { HistoryIcon, XIcon } from 'lucide-react';
-import { useChats } from '@/lib/hooks/use-chat';
+import { useChats } from '@/hooks/use-chat';
 import {
   Sheet,
   SheetContent,

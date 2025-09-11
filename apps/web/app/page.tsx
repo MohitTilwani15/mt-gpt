@@ -12,7 +12,7 @@ import ErrorBoundary from "@/components/error-boundary";
 import ChatHeader from "@/components/chat-header";
 import ChatInput from "@/components/chat-input";
 import ConversationHistory from "@/components/conversation-history";
-import { useSelectedModel, createChat, useFileUpload } from "@/lib/hooks/index";
+import { useSelectedModel, createChat, useFileUpload } from "@/hooks/index";
 import { UIMessage, FileUIPart } from "ai";
 
 interface UploadedFile {

@@ -17,7 +17,7 @@ import ChatHeader from "@/components/chat-header";
 import MessageList from "@/components/message-list";
 import ChatInput from "@/components/chat-input";
 import ConversationHistory from "@/components/conversation-history";
-import { useSelectedModel, useFileUpload } from "@/lib/hooks/index";
+import { useSelectedModel, useFileUpload } from "@/hooks/index";
 import { Button } from "@workspace/ui/components/button";
 
 interface UploadedFile {

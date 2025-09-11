@@ -3,10 +3,10 @@
 import { useCopyToClipboard } from 'usehooks-ts';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { UIMessage, ChatStatus } from 'ai';
 import { CopyIcon, ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon } from 'lucide-react';
 import { Button } from '@workspace/ui/components/button';
-import { UIMessage, ChatStatus } from 'ai';
-import { updateVote } from '@/lib/hooks/use-votes';
+import { updateVote } from '@/hooks/use-votes';
 
 interface MessageActionsProps {
   chatId: string;

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BotIcon } from 'lucide-react';
 import { ChatStatus, UIMessage } from 'ai';
-import { useVotes, getVoteForMessage } from '@/lib/hooks/use-votes';
+import { useVotes, getVoteForMessage } from '@/hooks/use-votes';
 
 import {
   Message,
