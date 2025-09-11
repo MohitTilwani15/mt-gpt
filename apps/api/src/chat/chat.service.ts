@@ -29,6 +29,7 @@ import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
 import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
+import { LinkUpSoWebSearchToolService } from '../lib/tools/linkup-so-web-search.tool'
 
 @Injectable()
 export class ChatService {
@@ -38,6 +39,7 @@ export class ChatService {
     private readonly voteQueryService: VoteQueryService,
     @Inject(DATABASE_CONNECTION)
     private readonly db: NodePgDatabase<typeof databaseSchema>,
+    private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession) {
@@ -186,6 +188,9 @@ export class ChatService {
           messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),
+          tools: {
+            webSearch: this.linkupsoWebSearchToolService.askLinkupTool()
+          },
           providerOptions: {
             openai: {
               reasoningEffort: 'high',

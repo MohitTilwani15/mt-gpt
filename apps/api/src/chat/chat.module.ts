@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { FileController } from './controllers/file.controller';
@@ -9,7 +11,7 @@ import { MessageQueryService } from 'src/database/queries/message.query';
 import { DocumentQueryService } from 'src/database/queries/document.query';
 import { VoteQueryService } from 'src/database/queries/vote.query';
 import { DatabaseModule } from 'src/database/database.module';
-import { ConfigModule } from '@nestjs/config';
+import { LinkUpSoWebSearchToolService } from 'src/lib/tools/linkup-so-web-search.tool';
 
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -22,6 +24,7 @@ import { ConfigModule } from '@nestjs/config';
     MessageQueryService,
     DocumentQueryService,
     VoteQueryService,
+    LinkUpSoWebSearchToolService
   ],
 })
 export class ChatModule {}
