@@ -19,7 +19,7 @@ import {
 } from '@workspace/ui/components/ui/shadcn-io/ai/prompt-input';
 
 import { SUPPORTED_FILE_TYPES } from '../lib/utils';
-import type { ChatModel } from '../lib/models';
+import type { ChatModel } from '@/hooks/use-models';
 import TextInputAttachments from './text-input-attachments';
 
 interface UploadedFile {

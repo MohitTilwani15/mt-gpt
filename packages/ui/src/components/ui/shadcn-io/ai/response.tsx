@@ -27,7 +27,7 @@ function parseIncompleteMarkdown(text: string): string {
   // Pattern: [...] or ![...] where the closing ] is missing
   const linkImagePattern = /(!?\[)([^\]]*?)$/;
   const linkMatch = result.match(linkImagePattern);
-  if (linkMatch) {
+  if (linkMatch && linkMatch[1]) {
     // If we have an unterminated [ or ![, remove it and everything after
     const startIndex = result.lastIndexOf(linkMatch[1]);
     result = result.substring(0, startIndex);

@@ -1,5 +1,4 @@
 import useSWR, { SWRConfiguration } from 'swr';
-import { UIMessage } from 'ai';
 
 export interface ChatResponse {
   chats: Array<{

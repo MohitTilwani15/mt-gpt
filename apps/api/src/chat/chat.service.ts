@@ -205,18 +205,12 @@ export class ChatService {
           },
           onFinish: ({ usage }) => {
             finalUsage = usage
-            dataStream.write({ type: 'data-usage', data: usage });
           }
         });
 
         result.consumeStream();
 
-        dataStream.merge(
-          result.toUIMessageStream({
-            sendReasoning: true,
-            sendSources: true
-          }),
-        );
+        dataStream.merge(result.toUIMessageStream({ sendReasoning: true, sendSources: true }));
       },
       generateId: uuidv4,
       onFinish: async ({ responseMessage }) => {
