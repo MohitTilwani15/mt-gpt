@@ -7,6 +7,7 @@ import { CloudflareR2Service } from '../services/cloudflare-r2.service';
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
 import { DocumentQueryService } from 'src/database/queries/document.query';
+import { VoteQueryService } from 'src/database/queries/vote.query';
 import { DatabaseModule } from 'src/database/database.module';
 import { ConfigModule } from '@nestjs/config';
 
@@ -20,6 +21,7 @@ import { ConfigModule } from '@nestjs/config';
     ChatQueryService,
     MessageQueryService,
     DocumentQueryService,
+    VoteQueryService,
   ],
 })
 export class ChatModule {}

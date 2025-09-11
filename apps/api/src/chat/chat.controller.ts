@@ -8,6 +8,7 @@ import {
   Res,
   UseGuards,
   HttpStatus,
+  Patch,
 } from '@nestjs/common';
 import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
 import { Response } from 'express';
@@ -19,6 +20,8 @@ import {
   PostChatRequestDto,
   GetChatsQueryDto,
   GetMessagesQueryDto,
+  VoteMessageDto,
+  GetVotesQueryDto,
   ChatModel,
   CHAT_MODEL_NAMES,
 } from './dto/chat.dto';
@@ -205,6 +208,54 @@ export class ChatController {
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
+      });
+    }
+  }
+
+  @Patch('vote')
+  async updateVote(
+    @Body() body: VoteMessageDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.chatService.updateVote(body, session);
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Failed to update vote',
+      });
+    }
+  }
+
+  @Get('votes')
+  async getVotes(
+    @Query() query: GetVotesQueryDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const votes = await this.chatService.getVotes(query.chatId, session);
+      return res.json(votes);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Failed to fetch votes',
       });
     }
   }
