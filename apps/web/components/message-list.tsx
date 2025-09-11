@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BotIcon } from 'lucide-react';
-import { UIMessage } from 'ai';
+import { ChatStatus, UIMessage } from 'ai';
 
 import {
   Message,
@@ -13,11 +13,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger
-} from '@workspace/ui/components/ui/shadcn-io/ai/reasoning'
+import { MessageReasoning } from './message-reasoning';
 import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
 import DocumentPreview from './document-preview';
@@ -34,9 +30,10 @@ interface MessageDocument {
 
 interface MessageListProps {
   messages: UIMessage[];
+  status: ChatStatus
 }
 
-export default function MessageList({ messages }: MessageListProps) {
+export default function MessageList({ messages, status }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [previewDocument, setPreviewDocument] = useState<MessageDocument | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -80,20 +77,19 @@ export default function MessageList({ messages }: MessageListProps) {
                 <MessageContent>
                   <div>
                     {message.parts.map((part, index) => {
-                      if (part.type === "reasoning") {
+                      const { type } = part;
+                      const key = `message-${message.id}-part-${index}`;
+
+                      if (type === "reasoning" && part.text?.trim().length > 0) {
                         return (
-                          <div key={index} className="mb-4">
-                            <Reasoning>
-                              <div className="prose prose-sm max-w-none">
-                                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                                  {part.text}
-                                </pre>
-                              </div>
-                            </Reasoning>
-                          </div>
+                          <MessageReasoning
+                            key={key}
+                            isLoading={status === 'streaming'}
+                            reasoning={part.text}
+                          />
                         );
                       }
-                      if (part.type === "text") {
+                      if (type === "text") {
                         return (
                           <div key={index}>
                             <MarkdownRenderer content={part.text} />

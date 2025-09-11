@@ -187,7 +187,7 @@ export class ChatService {
           experimental_transform: smoothStream({ chunking: 'word' }),
           providerOptions: {
             openai: {
-              reasoningEffort: 'medium'
+              reasoningEffort: 'high'
             },
             xai: {
               reasoningEffort: 'high',

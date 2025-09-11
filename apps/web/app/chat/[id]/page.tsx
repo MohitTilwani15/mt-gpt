@@ -42,6 +42,11 @@ export default function ChatPage() {
   const supportedModels = modelsData?.models || [];
   const [selectedModel, setSelectedModel] = useState<string>(modelsData?.defaultModel || "");
 
+  const selectedModelRef = useRef<string>(selectedModel);
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { messages, sendMessage, status, setMessages } = useChat({
@@ -53,7 +58,7 @@ export default function ChatPage() {
           return {
             body: {
               id: chatId,
-              selectedChatModel: selectedModel,
+              selectedChatModel: selectedModelRef.current,
               message: lastMessage,
             },
           };
