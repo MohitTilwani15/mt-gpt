@@ -37,6 +37,7 @@
     "@types/react-dom": "^19.1.7",
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
+    "ai-sdk-devtools": "^0.4.0",
     "typescript": "^5.9.2"
   }
 }

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessage } from "ai";
+import { AIDevtools } from "ai-sdk-devtools";
 import { useRouter, useParams } from "next/navigation";
 
 import ErrorBoundary from "@/components/error-boundary";
@@ -230,6 +231,28 @@ export default function ChatPage() {
           onSubmit={handleChatSubmit}
           status={status}
         />
+
+        {process.env.NEXT_PUBLIC_NODE_ENV === "development" &&
+          <AIDevtools
+            enabled={true}
+            maxEvents={1000}
+            config={{
+              position: "bottom",
+              height: 400,
+              streamCapture: {
+                enabled: true,
+                endpoint: "/api/chat",
+                autoConnect: true
+              },
+              throttle: {
+                enabled: true,
+                interval: 100,
+                includeTypes: ["text-delta"]
+              }
+            }}
+            debug={false}
+          />
+        }
       </div>
     </ErrorBoundary>
   );

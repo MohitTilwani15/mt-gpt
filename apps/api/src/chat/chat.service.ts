@@ -17,7 +17,6 @@ import { eq } from 'drizzle-orm';
 
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
-import { DocumentQueryService } from 'src/database/queries/document.query';
 import { VoteQueryService } from 'src/database/queries/vote.query';
 import { ChatSDKError } from 'src/lib/errors';
 import {
