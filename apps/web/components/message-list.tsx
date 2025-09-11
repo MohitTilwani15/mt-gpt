@@ -14,9 +14,9 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
+import { Response } from '@workspace/ui/components/ui/shadcn-io/ai/response';
 import { MessageReasoning } from './message-reasoning';
 import { MessageActions } from './message-actions';
-import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
 import DocumentPreview from './document-preview';
 
@@ -100,9 +100,9 @@ export default function MessageList({ messages, status, chatId, onRegenerate }: 
                       }
                       if (type === "text") {
                         return (
-                          <div key={index}>
-                            <MarkdownRenderer content={part.text} />
-                          </div>
+                          <Response key={`${message.id}-${index}`}>
+                            {part.text}  
+                          </Response>
                         );
                       }
                       return null;
