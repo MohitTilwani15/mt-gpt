@@ -19,6 +19,8 @@ import {
   PostChatRequestDto,
   GetChatsQueryDto,
   GetMessagesQueryDto,
+  ChatModel,
+  CHAT_MODEL_NAMES,
 } from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
 
@@ -106,6 +108,26 @@ export class ChatController {
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'offline:chat',
         message: 'Internal server error',
+      });
+    }
+  }
+
+  @Get('models')
+  async getSupportedModels(@Res() res: Response) {
+    try {
+      const models = Object.values(ChatModel).map((modelId) => ({
+        id: modelId,
+        name: CHAT_MODEL_NAMES[modelId],
+      }));
+
+      return res.json({
+        models,
+        defaultModel: ChatModel.GPT_4O,
+      });
+    } catch (error) {
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Failed to fetch supported models',
       });
     }
   }

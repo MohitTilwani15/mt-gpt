@@ -13,6 +13,11 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger
+} from '@workspace/ui/components/ui/shadcn-io/ai/reasoning'
 import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
 import DocumentPreview from './document-preview';
@@ -74,13 +79,29 @@ export default function MessageList({ messages }: MessageListProps) {
               <Message key={message.id} from={message.role}>
                 <MessageContent>
                   <div>
-                    {message.parts.map((part, index) =>
-                      part.type === "text" ? (
-                        <div key={index}>
-                          <MarkdownRenderer content={part.text} />
-                        </div>
-                      ) : null,
-                    )}
+                    {message.parts.map((part, index) => {
+                      if (part.type === "reasoning") {
+                        return (
+                          <div key={index} className="mb-4">
+                            <Reasoning>
+                              <div className="prose prose-sm max-w-none">
+                                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                                  {part.text}
+                                </pre>
+                              </div>
+                            </Reasoning>
+                          </div>
+                        );
+                      }
+                      if (part.type === "text") {
+                        return (
+                          <div key={index}>
+                            <MarkdownRenderer content={part.text} />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
 
                   <DocumentAttachments

@@ -12,12 +12,12 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessage } from "ai";
 import { useRouter, useParams } from "next/navigation";
 
-import ErrorBoundary from "../../../components/error-boundary";
-import ChatHeader from "../../../components/chat-header";
-import MessageList from "../../../components/message-list";
-import ChatInput from "../../../components/chat-input";
-import ConversationHistory from "../../../components/conversation-history";
-import { SUPPORTED_MODELS, DEFAULT_LLM_MODEL } from "../../../lib/models";
+import ErrorBoundary from "@/components/error-boundary";
+import ChatHeader from "@/components/chat-header";
+import MessageList from "@/components/message-list";
+import ChatInput from "@/components/chat-input";
+import ConversationHistory from "@/components/conversation-history";
+import { useSupportedModels } from "@/lib/use-models";
 import { Button } from "@workspace/ui/components/button";
 
 interface UploadedFile {
@@ -34,10 +34,13 @@ export default function ChatPage() {
   const chatId = params.id;
   
   const [text, setText] = useState<string>("");
-  const [model, setModel] = useState<string>(DEFAULT_LLM_MODEL!.id);
   const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  const { data: modelsData } = useSupportedModels();
+  const supportedModels = modelsData?.models || [];
+  const [selectedModel, setSelectedModel] = useState<string>(modelsData?.defaultModel || "");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +53,7 @@ export default function ChatPage() {
           return {
             body: {
               id: chatId,
-              selectedChatModel: model,
+              selectedChatModel: selectedModel,
               message: lastMessage,
             },
           };
@@ -67,8 +70,16 @@ export default function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
+    if (modelsData?.defaultModel && !selectedModel) {
+      setSelectedModel(modelsData.defaultModel);
+    }
+  }, [modelsData, selectedModel]);
+
+  useEffect(() => {
     const loadChat = async () => {
       try {
+        if (!modelsData) return;
+
         setError(null);
 
         const initialMessageData = sessionStorage.getItem(`chat-${chatId}`);
@@ -103,7 +114,7 @@ export default function ChatPage() {
     if (chatId) {
       loadChat();
     }
-  }, []);
+  }, [modelsData]);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
@@ -153,6 +164,11 @@ export default function ChatPage() {
   const handleChatSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
 
+    if (!selectedModel && supportedModels.length > 0) {
+      setError('Please select a model before sending a message.');
+      return;
+    }
+
     if (text.trim() || uploadedFiles.length > 0) {
       await sendMessage({
         text: text.trim(),
@@ -201,11 +217,11 @@ export default function ChatPage() {
         />
 
         <ChatInput
-          models={SUPPORTED_MODELS}
+          models={supportedModels}
           text={text}
           setText={setText}
-          model={model}
-          setModel={setModel}
+          model={selectedModel}
+          setModel={setSelectedModel}
           isFileUploading={isFileUploading}
           uploadedFiles={uploadedFiles}
           onFileUpload={handleFileUpload}

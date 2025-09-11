@@ -10,6 +10,7 @@ import {
   UIMessage,
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { xai } from '@ai-sdk/xai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
@@ -27,7 +28,6 @@ import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
 import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
-import { DBMessage } from '../database/schemas/conversation.schema'
 
 @Injectable()
 export class ChatService {
@@ -172,12 +172,27 @@ export class ChatService {
         //   }
         // }
 
+        let model;
+        if (selectedChatModel === 'grok-3-mini' || selectedChatModel === 'grok-3') {
+          model = xai(selectedChatModel);
+        } else {
+          model = openai(selectedChatModel || 'gpt-4o');
+        }
+
         const result = streamText({
-          model: openai(selectedChatModel || 'gpt-4o'),
+          model,
           system: this.getSystemPrompt(),
           messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),
+          providerOptions: {
+            openai: {
+              reasoningEffort: 'medium'
+            },
+            xai: {
+              reasoningEffort: 'high',
+            }
+          }
         });
 
         result.consumeStream();
@@ -185,6 +200,7 @@ export class ChatService {
         dataStream.merge(
           result.toUIMessageStream({
             sendReasoning: true,
+            sendSources: true
           }),
         );
       },
@@ -192,7 +208,8 @@ export class ChatService {
       onFinish: async ({ responseMessage }) => {
         await this.messageQueryService.upsertMessage({ messageId: responseMessage.id, chatId, message: responseMessage })
       },
-      onError: () => {
+      onError: (error) => {
+        console.error('error while streaming response', error)
         return 'Oops, an error occurred!';
       },
     });

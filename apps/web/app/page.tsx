@@ -5,14 +5,15 @@ import {
   FormEventHandler,
   useState,
   useCallback,
+  useEffect,
 } from "react";
 import { useRouter } from "next/navigation";
 
-import ErrorBoundary from "../components/error-boundary";
-import ChatHeader from "../components/chat-header";
-import ChatInput from "../components/chat-input";
-import ConversationHistory from "../components/conversation-history";
-import { SUPPORTED_MODELS, DEFAULT_LLM_MODEL } from "../lib/models";
+import ErrorBoundary from "@/components/error-boundary";
+import ChatHeader from "@/components/chat-header";
+import ChatInput from "@/components/chat-input";
+import ConversationHistory from "@/components/conversation-history";
+import { useSupportedModels } from "@/lib/use-models";
 import { UIMessage, FileUIPart } from "ai";
 
 interface UploadedFile {
@@ -27,10 +28,19 @@ interface UploadedFile {
 export default function Page() {
   const router = useRouter();
   const [text, setText] = useState<string>("");
-  const [model, setModel] = useState<string>(DEFAULT_LLM_MODEL!.id);
   const [isFileUploading, setIsFileUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [chatId] = useState<string>(() => uuidv4());
+  
+  const { data: modelsData, error: modelsError } = useSupportedModels();
+  const supportedModels = modelsData?.models || [];
+  const [selectedModel, setSelectedModel] = useState<string>(modelsData?.defaultModel || "");
+
+  useEffect(() => {
+    if (modelsData?.defaultModel && !selectedModel) {
+      setSelectedModel(modelsData.defaultModel);
+    }
+  }, [modelsData, selectedModel]);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
@@ -79,6 +89,10 @@ export default function Page() {
 
   const handleChatSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
+
+    if (modelsError) return;
+
+    if (!selectedModel && supportedModels.length > 0) return;
 
     if (text.trim() || uploadedFiles.length > 0) {
       const files: FileUIPart[] = uploadedFiles.map((file) => ({
@@ -132,6 +146,25 @@ export default function Page() {
     }
   };
 
+  if (modelsError) {
+    return (
+      <ErrorBoundary>
+        <div className="flex flex-col h-screen">
+          <ChatHeader title="AI Chat">
+            <ConversationHistory />
+          </ChatHeader>
+          
+          <div className="flex-1 flex items-center justify-center px-4">
+            <div className="text-center max-w-md">
+              <h2 className="text-xl font-semibold mb-2">Error</h2>
+              <p className="text-muted-foreground mb-4">Failed to load available models. Please refresh the page.</p>
+            </div>
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-screen">
@@ -150,11 +183,11 @@ export default function Page() {
             
             <div className="relative">
               <ChatInput
-                models={SUPPORTED_MODELS}
+                models={supportedModels}
                 text={text}
                 setText={setText}
-                model={model}
-                setModel={setModel}
+                model={selectedModel}
+                setModel={setSelectedModel}
                 isFileUploading={isFileUploading}
                 uploadedFiles={uploadedFiles}
                 onFileUpload={handleFileUpload}

@@ -222,6 +222,9 @@ importers:
       streamdown:
         specifier: ^1.2.0
         version: 1.2.0(@types/react@19.1.9)(react@19.1.1)
+      swr:
+        specifier: ^2.3.6
+        version: 2.3.6(react@19.1.1)
       uuid:
         specifier: ^12.0.0
         version: 12.0.0

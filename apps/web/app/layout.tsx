@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 import { MainLayout } from "@/components/main-layout"
+import SWRProvider from "@/components/swr-provider"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -25,7 +26,9 @@ export default function RootLayout({
         className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased `}
       >
         <Providers>
-          <MainLayout>{children}</MainLayout>
+          <SWRProvider>
+            <MainLayout>{children}</MainLayout>
+          </SWRProvider>
         </Providers>
       </body>
     </html>
