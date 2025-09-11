@@ -53,19 +53,12 @@ export default function DocumentAttachments({ message, onPreview }: DocumentAtta
                 </p>
               </div>
               <div className="flex items-center gap-1">
-                {/* <Button
+                <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onPreview(doc)}
                 >
                   <EyeIcon className="h-3 w-3" />
-                </Button> */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(doc.downloadUrl, '_blank')}
-                >
-                  <DownloadIcon className="h-3 w-3" />
                 </Button>
               </div>
             </CardContent>

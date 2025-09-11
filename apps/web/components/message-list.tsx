@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { BotIcon } from 'lucide-react';
 import { UIMessage } from 'ai';
 
@@ -15,6 +15,7 @@ import {
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import MarkdownRenderer from './markdown-renderer';
 import DocumentAttachments from './document-attachments';
+import DocumentPreview from './document-preview';
 
 interface MessageDocument {
   id: string;
@@ -28,14 +29,12 @@ interface MessageDocument {
 
 interface MessageListProps {
   messages: UIMessage[];
-  onDocumentPreview?: (document: MessageDocument) => void;
 }
 
-export default function MessageList({
-  messages,
-  onDocumentPreview,
-}: MessageListProps) {
+export default function MessageList({ messages }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [previewDocument, setPreviewDocument] = useState<MessageDocument | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -44,6 +43,19 @@ export default function MessageList({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleDocumentPreview = useCallback((document: MessageDocument) => {
+    setPreviewDocument(document);
+    setIsPreviewOpen(true);
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setIsPreviewOpen(false);
+    
+    setTimeout(() => {
+      setPreviewDocument(null);
+    }, 300);
+  }, []);
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -73,7 +85,7 @@ export default function MessageList({
 
                   <DocumentAttachments
                     message={message}
-                    onPreview={onDocumentPreview || (() => {})}
+                    onPreview={handleDocumentPreview}
                   />
                 </MessageContent>
               </Message>
@@ -83,6 +95,12 @@ export default function MessageList({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
+      
+      <DocumentPreview
+        document={previewDocument}
+        isOpen={isPreviewOpen}
+        onClose={handleClosePreview}
+      />
     </div>
   );
 }
