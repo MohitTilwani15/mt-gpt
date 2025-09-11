@@ -219,6 +219,7 @@ export default function ChatPage() {
         
         <MessageList
           messages={messages}
+          status={status}
         />
 
         <ChatInput
