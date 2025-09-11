@@ -18,10 +18,12 @@ import { eq } from 'drizzle-orm';
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
 import { DocumentQueryService } from 'src/database/queries/document.query';
+import { VoteQueryService } from 'src/database/queries/vote.query';
 import { ChatSDKError } from 'src/lib/errors';
 import {
   PostChatRequestDto,
   GetMessagesQueryDto,
+  VoteMessageDto,
   ChatModel,
 } from './dto/chat.dto';
 import { ChatResponse } from './interfaces/chat.interface';
@@ -34,7 +36,7 @@ export class ChatService {
   constructor(
     private readonly chatQueryService: ChatQueryService,
     private readonly messageQueryService: MessageQueryService,
-    private readonly documentQueryService: DocumentQueryService,
+    private readonly voteQueryService: VoteQueryService,
     @Inject(DATABASE_CONNECTION)
     private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
@@ -234,6 +236,17 @@ export class ChatService {
 
   private getSystemPrompt(): string {
     return `You are a helpful AI assistant. Please provide clear and helpful responses.`;
+  }
+
+  async updateVote(
+    request: VoteMessageDto,
+    session: UserSession,
+  ) {
+    return await this.voteQueryService.updateVote(request, session.user.id);
+  }
+
+  async getVotes(chatId: string, session: UserSession) {
+    return await this.voteQueryService.getVotes(chatId, session.user.id);
   }
 
   async getMessagesByChatId(

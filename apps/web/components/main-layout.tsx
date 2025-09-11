@@ -1,5 +1,6 @@
 "use client"
 
+import { Toaster } from "sonner"
 import { usePathname } from "next/navigation"
 import {
   SidebarInset,
@@ -33,6 +34,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <SidebarProvider>
+      <Toaster position="top-center" />
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
