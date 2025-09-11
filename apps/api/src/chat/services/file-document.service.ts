@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 import { extractText, getDocumentProxy } from 'unpdf';
+import * as mammoth from 'mammoth';
 
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
@@ -33,7 +34,7 @@ export class FileDocumentService {
 
   async createFileDocument(params: CreateFileDocumentParams) {
     const { chatId, file, extractText: shouldExtractText = false, userId } = params;
-
+    
     const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
       file,
     });
@@ -42,13 +43,18 @@ export class FileDocumentService {
     let embedding = null;
 
     try {
-      if (shouldExtractText && file.mimetype === 'application/pdf') {
+      if (shouldExtractText) {
         try {
-          const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
-          const { text } = await extractText(pdf, { mergePages: true });
-          textContent = text;
+          if (file.mimetype === 'application/pdf') {
+            const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
+            const { text } = await extractText(pdf, { mergePages: true });
+            textContent = text;
+          } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            const result = await mammoth.extractRawText({ buffer: file.buffer });
+            textContent = result.value;
+          }
   
-          if (textContent.trim()) {
+          if (textContent && textContent.trim()) {
             const { embedding: textEmbedding } = await embed({
               model: openai.embedding(this.configService.getOrThrow<string>('EMBEDDING_MODEL')),
               value: textContent,
@@ -56,7 +62,7 @@ export class FileDocumentService {
             embedding = textEmbedding;
           }
         } catch (error) {
-          console.warn('Failed to extract text from PDF:', error);
+          console.warn(`Failed to extract text from ${file.mimetype}:`, error);
         }
       }
 

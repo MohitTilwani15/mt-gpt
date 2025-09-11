@@ -12,7 +12,7 @@ import {
 import { openai } from '@ai-sdk/openai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import { ChatQueryService } from 'src/database/queries/chat.query';
 import { MessageQueryService } from 'src/database/queries/message.query';
@@ -142,38 +142,39 @@ export class ChatService {
   }) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        let contextPrompt = '';
-        const lastMessage = messages[messages.length - 1];
+        // TODO: Check how below could be improved
+        // let contextPrompt = '';
+        // const lastMessage = messages[messages.length - 1];
 
-        if (lastMessage && lastMessage.role === 'user') {
-          const userQuery = lastMessage.parts
-            .map((part: any) => part.text)
-            .join(' ');
+        // if (lastMessage && lastMessage.role === 'user') {
+        //   const userQuery = lastMessage.parts
+        //     .map((part: any) => part.text)
+        //     .join(' ');
 
-          try {
-            const relevantDocs =
-              await this.documentQueryService.searchDocuments({
-                chatId,
-                query: userQuery,
-                limit: 3,
-              });
+        //   try {
+        //     const relevantDocs =
+        //       await this.documentQueryService.searchDocuments({
+        //         chatId,
+        //         query: userQuery,
+        //         limit: 3,
+        //       });
 
-            if (relevantDocs.length > 0) {
-              contextPrompt = '\n\nRelevant context from uploaded documents:\n';
-              relevantDocs.forEach((doc) => {
-                contextPrompt += `\n---\n${doc.text}\n---\n`;
-              });
-              contextPrompt +=
-                '\nPlease use the above context to inform your response. ';
-            }
-          } catch (error) {
-            console.error('Error searching documents:', error);
-          }
-        }
+        //     if (relevantDocs.length > 0) {
+        //       contextPrompt = '\n\nRelevant context from uploaded documents:\n';
+        //       relevantDocs.forEach((doc) => {
+        //         contextPrompt += `\n---\n${doc.text}\n---\n`;
+        //       });
+        //       contextPrompt +=
+        //         '\nPlease use the above context to inform your response. ';
+        //     }
+        //   } catch (error) {
+        //     console.error('Error searching documents:', error);
+        //   }
+        // }
 
         const result = streamText({
           model: openai(selectedChatModel || 'gpt-4o'),
-          system: this.getSystemPrompt() + contextPrompt,
+          system: this.getSystemPrompt(),
           messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),

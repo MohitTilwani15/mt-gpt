@@ -12,7 +12,6 @@ interface MessageDocument {
   fileName?: string;
   fileSize?: number;
   mimeType: string;
-  text?: string;
   downloadUrl: string;
 }
 

@@ -26,6 +26,7 @@ export default function DocumentPreview({ document, isOpen, onClose }: DocumentP
   if (!document) return null;
 
   const isPdf = document.mimeType === 'application/pdf';
+  const isDocx = document.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -50,6 +51,16 @@ export default function DocumentPreview({ document, isOpen, onClose }: DocumentP
                 src={document.downloadUrl}
                 className="w-full h-full border-0 rounded-lg"
                 title={document.fileName || 'PDF Preview'}
+              />
+            </div>
+          )}
+
+          {isDocx && (
+            <div className="h-full">
+              <iframe
+                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(document.downloadUrl)}`}
+                className="w-full h-full border-0 rounded-lg"
+                title={document.fileName || 'DOCX Preview'}
               />
             </div>
           )}
