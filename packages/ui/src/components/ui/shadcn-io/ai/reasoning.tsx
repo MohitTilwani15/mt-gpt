@@ -10,7 +10,7 @@ import { cn } from '@workspace/ui/lib/utils';
 import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { createContext, memo, useContext, useEffect, useState } from 'react';
-import { Response } from './response.js';
+import { Response } from './response';
 
 type ReasoningContextValue = {
   isStreaming: boolean;
