@@ -39,7 +39,13 @@ function PureStopButton({
       onClick={(event) => {
         event.preventDefault();
         stop();
-        setMessages((messages) => messages);
+        setMessages((messages) => {
+          const lastMessage = messages[messages.length - 1];
+          if (lastMessage?.role === 'assistant') {
+            return messages.slice(0, -1);
+          }
+          return messages;
+        });
       }}
     >
       <StopIcon size={14} />
