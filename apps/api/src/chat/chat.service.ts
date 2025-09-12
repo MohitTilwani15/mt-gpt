@@ -43,7 +43,7 @@ export class ChatService {
     private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService
   ) {}
 
-  async createChat(requestBody: PostChatRequestDto, session: UserSession) {
+  async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
     const { id, message, selectedChatModel } = requestBody;
 
     const existingChat = await this.chatQueryService.getChatById({ id });
@@ -87,7 +87,8 @@ export class ChatService {
         chatId: id,
         messages: messages1,
         selectedChatModel,
-        message
+        message,
+        abortSignal
       });
     });
   }
@@ -137,12 +138,14 @@ export class ChatService {
     chatId,
     messages,
     selectedChatModel,
-    message
+    message,
+    abortSignal
   }: {
     chatId: string;
     messages: UIMessage[];
     selectedChatModel: ChatModel;
     message: UIMessage;
+    abortSignal?: AbortSignal
   }) {
     let finalUsage: LanguageModelUsage | undefined;
 
@@ -205,7 +208,8 @@ export class ChatService {
           },
           onFinish: ({ usage }) => {
             finalUsage = usage
-          }
+          },
+          abortSignal,
         });
 
         result.consumeStream();
@@ -213,7 +217,11 @@ export class ChatService {
         dataStream.merge(result.toUIMessageStream({ sendReasoning: true, sendSources: true }));
       },
       generateId: uuidv4,
-      onFinish: async ({ responseMessage }) => {
+      onFinish: async ({ responseMessage, isAborted }) => {
+        if (isAborted) {
+          return
+        }
+
         await this.messageQueryService.upsertMessage({ messageId: responseMessage.id, chatId, message: responseMessage })
 
         if (finalUsage) {

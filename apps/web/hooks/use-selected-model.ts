@@ -23,8 +23,6 @@ export function useSelectedModel() {
   const setSelectedModel = (model: string) => {
     if (availableIds.includes(model)) {
       setStoredModel(model);
-    } else {
-      console.warn(`Tried to set unsupported model "${model}"`);
     }
   };
 

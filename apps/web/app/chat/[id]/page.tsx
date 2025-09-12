@@ -53,7 +53,7 @@ export default function ChatPage() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status, setMessages, stop } = useChat({
     generateId: () => uuidv4(),
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -230,6 +230,8 @@ export default function ChatPage() {
           onRemoveFile={removeFile}
           onSubmit={handleChatSubmit}
           status={status}
+          setMessages={setMessages}
+          stop={stop}
         />
 
         {process.env.NEXT_PUBLIC_NODE_ENV === "development" &&

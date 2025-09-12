@@ -9,9 +9,10 @@ import {
   UseGuards,
   HttpStatus,
   Patch,
+  Req,
 } from '@nestjs/common';
 import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { Readable } from 'stream';
 import { JsonToSseTransformStream } from 'ai';
 
@@ -37,9 +38,16 @@ export class ChatController {
     @Body() body: PostChatRequestDto,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
-      const result = await this.chatService.createChat(body, session);
+      const ac = new AbortController();
+      const abort = () => { if (!ac.signal.aborted) ac.abort(); };
+      req.on('aborted', abort);
+      req.on('close', abort);
+      res.on('close', abort);
+
+      const result = await this.chatService.createChat(body, session, ac.signal);
       const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
       const nodeReadable = Readable.fromWeb(webSseStream);
 

@@ -2,7 +2,7 @@
 
 import { useRef, FormEventHandler } from 'react';
 import { PaperclipIcon } from 'lucide-react';
-import { ChatStatus } from 'ai'
+import { ChatStatus, UIMessage } from 'ai'
 
 import {
   PromptInput,
@@ -18,9 +18,11 @@ import {
   PromptInputTools,
 } from '@workspace/ui/components/ui/shadcn-io/ai/prompt-input';
 
-import { SUPPORTED_FILE_TYPES } from '../lib/utils';
+import { SUPPORTED_FILE_TYPES } from '@/lib/utils';
 import type { ChatModel } from '@/hooks/use-models';
+import { StopButton } from "@/components/stop-button";
 import TextInputAttachments from './text-input-attachments';
+import { UseChatHelpers } from '@ai-sdk/react';
 
 interface UploadedFile {
   id: string;
@@ -43,6 +45,8 @@ interface ChatInputProps {
   isFileUploading: boolean;
   status: ChatStatus;
   className?: string;
+  setMessages: UseChatHelpers<UIMessage>['setMessages'];
+  stop: () => void;
 }
 
 export default function ChatInput({
@@ -58,6 +62,8 @@ export default function ChatInput({
   isFileUploading,
   status,
   className,
+  setMessages,
+  stop,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,14 +120,18 @@ export default function ChatInput({
               </PromptInputModelSelectContent>
             </PromptInputModelSelect>
           </PromptInputTools>
-          <PromptInputSubmit
-            disabled={
-              (!text.trim() && uploadedFiles.length === 0) ||
-              status !== 'ready' ||
-              isFileUploading
-            }
-            status={status}
-          />
+          {status === 'streaming' ? (
+            <StopButton stop={stop} setMessages={setMessages} />
+          ) : (
+            <PromptInputSubmit
+              status={status}
+              disabled={
+                (!text.trim() && uploadedFiles.length === 0) ||
+                isFileUploading
+              }
+            />
+          )}
+          
         </PromptInputToolbar>
       </PromptInput>
 
