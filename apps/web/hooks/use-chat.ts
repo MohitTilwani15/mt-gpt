@@ -97,3 +97,28 @@ export const createChat = async (data: CreateChatRequest): Promise<Chat> => {
 
   return await response.json();
 };
+
+export const deleteChat = async (chatId: string): Promise<{ id: string; deleted: boolean } | void> => {
+  let res = await fetch(`/api/chat/${chatId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    res = await fetch(`/api/chat/${chatId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    });
+  }
+
+  if (!res.ok) {
+    throw new Error('Failed to delete chat');
+  }
+
+  try {
+    return await res.json();
+  } catch {
+    return;
+  }
+};

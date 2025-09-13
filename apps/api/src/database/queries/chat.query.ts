@@ -138,4 +138,13 @@ export class ChatQueryService {
       return;
     }
   }
+
+  async deleteChatById(id: string) {
+    try {
+      await this.db.delete(chat).where(eq(chat.id, id));
+      return { id };
+    } catch (error) {
+      throw new ChatSDKError('bad_request:database', 'Failed to delete chat');
+    }
+  }
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { HistoryIcon, XIcon } from 'lucide-react';
+import { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { HistoryIcon, Trash2Icon } from 'lucide-react';
 import { useChats } from '@/hooks/use-chat';
 import {
   Sheet,
@@ -13,6 +13,8 @@ import {
   SheetTrigger,
 } from '@workspace/ui/components/sheet';
 import { Button } from '@workspace/ui/components/button';
+import { deleteChat as deleteChatApi } from '@/hooks/use-chat';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 
 interface Conversation {
   id: string;
@@ -27,7 +29,9 @@ interface ConversationHistoryProps {
 
 export default function ConversationHistory({ trigger, onChatSelect }: ConversationHistoryProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   const { data: chatsData, isLoading, error, mutate } = useChats(50, undefined, undefined, {
     refreshInterval: 0,
@@ -42,6 +46,26 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
       router.push(`/chat/${chatId}`);
     }
     setIsOpen(false);
+  };
+
+  const openConfirm = (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation();
+    setPendingDeleteId(chatId);
+  };
+
+  const confirmDelete = async () => {
+    const chatId = pendingDeleteId;
+    if (!chatId) return;
+    try {
+      await deleteChatApi(chatId);
+      setPendingDeleteId(null);
+      await mutate();
+      if (pathname === `/chat/${chatId}`) {
+        router.push('/');
+      }
+    } catch (err) {
+      console.error('Delete chat failed', err);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -115,12 +139,33 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
                         {formatDate(conversation.createdAt)}
                       </p>
                     </div>
+                    <button
+                      onClick={(e) => openConfirm(e, conversation.id)}
+                      className="shrink-0 p-2 rounded hover:bg-muted text-muted-foreground"
+                      aria-label="Delete chat"
+                    >
+                      <Trash2Icon className="h-4 w-4" />
+                    </button>
                   </div>
                 </button>
               ))}
             </div>
           )}
         </div>
+        <Dialog open={!!pendingDeleteId} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete this chat?</DialogTitle>
+              <DialogDescription>
+                This action cannot be undone. This will permanently delete the conversation and its messages.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

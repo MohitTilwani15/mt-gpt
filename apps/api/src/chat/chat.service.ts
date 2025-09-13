@@ -152,6 +152,21 @@ export class ChatService {
     return chat;
   }
 
+  async deleteChatById(chatId: string, session: UserSession) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId });
+
+    if (!chat) {
+      throw new ChatSDKError('not_found:chat');
+    }
+
+    if (chat.userId !== session.user.id) {
+      throw new ChatSDKError('forbidden:chat');
+    }
+
+    await this.chatQueryService.deleteChatById(chatId);
+    return { id: chatId, deleted: true };
+  }
+
   private async generateAIResponse({
     chatId,
     messages,

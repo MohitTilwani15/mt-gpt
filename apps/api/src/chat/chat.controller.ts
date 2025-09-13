@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpStatus,
   Patch,
+  Delete,
   Req,
 } from '@nestjs/common';
 import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
@@ -188,6 +189,26 @@ export class ChatController {
         error: 'offline:chat',
         message: 'Internal server error',
       });
+    }
+  }
+
+  @Delete(':id')
+  async deleteChat(
+    @Param('id') id: string,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.chatService.deleteChatById(id, session);
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      return res.status(500).json({ error: 'offline:chat', message: 'Internal server error' });
     }
   }
 
