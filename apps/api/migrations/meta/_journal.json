@@ -22,6 +22,20 @@
       "when": 1757626066892,
       "tag": "0002_free_lightspeed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1757763931144,
+      "tag": "0003_early_callisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1757766986636,
+      "tag": "0004_brown_santa_claus",
+      "breakpoints": true
     }
   ]
 }

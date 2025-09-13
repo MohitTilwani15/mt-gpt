@@ -12,6 +12,7 @@ import { DocumentQueryService } from 'src/database/queries/document.query';
 import { VoteQueryService } from 'src/database/queries/vote.query';
 import { DatabaseModule } from 'src/database/database.module';
 import { LinkUpSoWebSearchToolService } from 'src/lib/tools/linkup-so-web-search.tool';
+import { MemoryService } from './services/memory.service';
 
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -24,7 +25,8 @@ import { LinkUpSoWebSearchToolService } from 'src/lib/tools/linkup-so-web-search
     MessageQueryService,
     DocumentQueryService,
     VoteQueryService,
-    LinkUpSoWebSearchToolService
+    LinkUpSoWebSearchToolService,
+    MemoryService,
   ],
 })
 export class ChatModule {}

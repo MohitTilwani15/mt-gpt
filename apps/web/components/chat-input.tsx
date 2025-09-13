@@ -45,8 +45,8 @@ interface ChatInputProps {
   isFileUploading: boolean;
   status: ChatStatus;
   className?: string;
-  setMessages: UseChatHelpers<UIMessage>['setMessages'];
-  stop: () => void;
+  setMessages?: UseChatHelpers<UIMessage>['setMessages'];
+  stop?: () => void;
 }
 
 export default function ChatInput({
@@ -120,7 +120,7 @@ export default function ChatInput({
               </PromptInputModelSelectContent>
             </PromptInputModelSelect>
           </PromptInputTools>
-          {status === 'streaming' ? (
+          {status === 'streaming' && stop && setMessages ? (
             <StopButton stop={stop} setMessages={setMessages} />
           ) : (
             <PromptInputSubmit

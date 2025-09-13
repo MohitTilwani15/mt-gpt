@@ -31,6 +31,7 @@ import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
 import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
 import { LinkUpSoWebSearchToolService } from '../lib/tools/linkup-so-web-search.tool'
+import { MemoryService } from './services/memory.service';
 
 @Injectable()
 export class ChatService {
@@ -40,7 +41,8 @@ export class ChatService {
     private readonly voteQueryService: VoteQueryService,
     @Inject(DATABASE_CONNECTION)
     private readonly db: NodePgDatabase<typeof databaseSchema>,
-    private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService
+    private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService,
+    private readonly memoryService: MemoryService,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
@@ -67,28 +69,53 @@ export class ChatService {
 
       await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message })
 
-      const messages = await transaction.query.message.findMany({
+      const dbMessages = await transaction.query.message.findMany({
         where: eq(databaseSchema.message.chatId, existingChat.id),
         with: {
           parts: {
             orderBy: (parts, { asc }) => [asc(parts.order)],
           },
         },
-        orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+        limit: 4,
       });
-    
-      const messages1 = messages.map((message) => ({
+
+      const messages = dbMessages.reverse().map((message) => ({
         id: message.id,
         role: message.role,
         parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
       }));
 
+      const userQueryText = this.extractTextFromParts(message.parts || []);
+
+      let memoryContext = '';
+      try {
+        const relevantMemories = await this.memoryService.searchMemories({
+          userId: session.user.id,
+          chatId: id,
+          query: userQueryText,
+          limit: 5,
+          minSimilarity: 0.1,
+        });
+
+        if (relevantMemories.length) {
+          const bullets = relevantMemories
+            .map((m) => `- ${m.text}`)
+            .join('\n');
+          memoryContext = `\n\nLong-term memory (relevant):\n${bullets}\n\nUse these only if helpful and relevant. Do not hallucinate.`;
+        }
+      } catch (err) {
+        console.warn('Memory retrieval failed', err);
+      }
+
       return this.generateAIResponse({
         chatId: id,
-        messages: messages1,
+        messages,
         selectedChatModel,
         message,
-        abortSignal
+        abortSignal,
+        userId: session.user.id,
+        additionalSystemContext: memoryContext,
       });
     });
   }
@@ -139,13 +166,17 @@ export class ChatService {
     messages,
     selectedChatModel,
     message,
-    abortSignal
+    abortSignal,
+    userId,
+    additionalSystemContext,
   }: {
     chatId: string;
     messages: UIMessage[];
     selectedChatModel: ChatModel;
     message: UIMessage;
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal;
+    userId: string;
+    additionalSystemContext?: string;
   }) {
     let finalUsage: LanguageModelUsage | undefined;
 
@@ -188,9 +219,13 @@ export class ChatService {
           model = openai(selectedChatModel || 'gpt-4o');
         }
 
+        const systemPrompt = [this.getSystemPrompt(), additionalSystemContext]
+          .filter(Boolean)
+          .join('');
+
         const result = streamText({
           model,
-          system: this.getSystemPrompt(),
+          system: systemPrompt,
           messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),
@@ -218,6 +253,20 @@ export class ChatService {
       },
       generateId: uuidv4,
       onFinish: async ({ responseMessage, isAborted }) => {
+        try {
+          const userTextFull = this.extractTextFromParts(message.parts || []);
+          if (userTextFull && userTextFull.trim()) {
+            await this.memoryService.createMemory({
+              userId,
+              chatId,
+              messageId: message.id,
+              text: userTextFull,
+            });
+          }
+        } catch (err) {
+          console.warn('Conversation memory write failed', err);
+        }
+
         if (isAborted) {
           return
         }
@@ -260,6 +309,15 @@ export class ChatService {
 
   private getSystemPrompt(): string {
     return `You are a helpful AI assistant. Please provide clear and helpful responses.`;
+  }
+
+  private extractTextFromParts(parts: UIMessage['parts'] | undefined): string {
+    if (!parts) return '';
+    return parts
+      .filter((p: any) => p?.type === 'text' && typeof (p as any).text === 'string')
+      .map((p: any) => (p as any).text)
+      .join(' ')
+      .slice(0, 4000);
   }
 
   async updateVote(
