@@ -220,6 +220,15 @@ export class ChatService {
           messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
           experimental_transform: smoothStream({ chunking: 'word' }),
+          experimental_telemetry: {
+            isEnabled: true,
+            functionId: 'chat',
+            metadata: {
+              userId: userId,
+              chatId: chatId,
+              model: selectedChatModel,
+            },
+          },
           tools: {
             webSearch: this.linkupsoWebSearchToolService.askLinkupTool()
           },
