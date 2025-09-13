@@ -31,7 +31,7 @@ import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
 import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
 import { LinkUpSoWebSearchToolService } from '../lib/tools/linkup-so-web-search.tool'
-import { MemoryService } from './services/memory.service';
+import { Mem0MemoryService } from './services/mem0-memory.service';
 
 @Injectable()
 export class ChatService {
@@ -42,7 +42,7 @@ export class ChatService {
     @Inject(DATABASE_CONNECTION)
     private readonly db: NodePgDatabase<typeof databaseSchema>,
     private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService,
-    private readonly memoryService: MemoryService,
+    private readonly mem0MemoryService: Mem0MemoryService,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
@@ -90,20 +90,11 @@ export class ChatService {
 
       let memoryContext = '';
       try {
-        const relevantMemories = await this.memoryService.searchMemories({
-          userId: session.user.id,
-          chatId: id,
-          query: userQueryText,
-          limit: 5,
-          minSimilarity: 0.1,
-        });
-
-        if (relevantMemories.length) {
-          const bullets = relevantMemories
-            .map((m) => `- ${m.text}`)
-            .join('\n');
-          memoryContext = `\n\nLong-term memory (relevant):\n${bullets}\n\nUse these only if helpful and relevant. Do not hallucinate.`;
-        }
+        memoryContext = await this.mem0MemoryService.getMemoryContext(
+          session.user.id,
+          userQueryText,
+          5
+        );
       } catch (err) {
         console.warn('Memory retrieval failed', err);
       }
@@ -255,12 +246,22 @@ export class ChatService {
       onFinish: async ({ responseMessage, isAborted }) => {
         try {
           const userTextFull = this.extractTextFromParts(message.parts || []);
-          if (userTextFull && userTextFull.trim()) {
-            await this.memoryService.createMemory({
+          const aiResponseText = this.extractTextFromParts(responseMessage.parts || []);
+          
+          if (userTextFull && userTextFull.trim() && aiResponseText && aiResponseText.trim()) {
+            await this.mem0MemoryService.addMemory({
               userId,
               chatId,
               messageId: message.id,
-              text: userTextFull,
+              messages: [
+                { role: 'user', content: userTextFull },
+                { role: 'assistant', content: aiResponseText }
+              ],
+              metadata: {
+                chatId,
+                messageId: message.id,
+                responseMessageId: responseMessage.id
+              }
             });
           }
         } catch (err) {

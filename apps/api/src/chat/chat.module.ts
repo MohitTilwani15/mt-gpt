@@ -13,6 +13,7 @@ import { VoteQueryService } from 'src/database/queries/vote.query';
 import { DatabaseModule } from 'src/database/database.module';
 import { LinkUpSoWebSearchToolService } from 'src/lib/tools/linkup-so-web-search.tool';
 import { MemoryService } from './services/memory.service';
+import { Mem0MemoryService } from './services/mem0-memory.service';
 
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -27,6 +28,7 @@ import { MemoryService } from './services/memory.service';
     VoteQueryService,
     LinkUpSoWebSearchToolService,
     MemoryService,
+    Mem0MemoryService,
   ],
 })
 export class ChatModule {}

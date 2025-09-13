@@ -39,6 +39,7 @@
     "drizzle-orm": "^0.44.5",
     "linkup-sdk": "^2.0.0",
     "mammoth": "^1.10.0",
+    "mem0ai": "^2.1.38",
     "multer": "^2.0.2",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
