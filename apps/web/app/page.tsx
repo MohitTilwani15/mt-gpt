@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import ErrorBoundary from "@/components/error-boundary";
 import ChatHeader from "@/components/chat-header";
 import ChatInput from "@/components/chat-input";
-import ConversationHistory from "@/components/conversation-history";
 import { useSelectedModel, createChat, useFileUpload } from "@/hooks/index";
 import { UIMessage, FileUIPart } from "ai";
 
@@ -113,9 +112,7 @@ export default function Page() {
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-screen">
-        <ChatHeader title="AI Chat">
-          <ConversationHistory />
-        </ChatHeader>
+        <ChatHeader title="AI Chat" />
         
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="w-full max-w-2xl">

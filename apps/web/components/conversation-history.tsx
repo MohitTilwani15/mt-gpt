@@ -16,12 +16,6 @@ import { Button } from '@workspace/ui/components/button';
 import { deleteChat as deleteChatApi } from '@/hooks/use-chat';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 
-interface Conversation {
-  id: string;
-  title: string;
-  createdAt: string;
-}
-
 interface ConversationHistoryProps {
   trigger?: React.ReactNode;
   onChatSelect?: (chatId: string) => void;
@@ -48,7 +42,7 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
     setIsOpen(false);
   };
 
-  const openConfirm = (e: React.MouseEvent, chatId: string) => {
+  const openConfirm = (e: React.MouseEvent | React.KeyboardEvent, chatId: string) => {
     e.stopPropagation();
     setPendingDeleteId(chatId);
   };
@@ -139,13 +133,24 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
                         {formatDate(conversation.createdAt)}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => openConfirm(e, conversation.id)}
-                      className="shrink-0 p-2 rounded hover:bg-muted text-muted-foreground"
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openConfirm(e, conversation.id);
+                      }}
+                      className="shrink-0 p-2 rounded hover:bg-muted text-muted-foreground cursor-pointer"
                       aria-label="Delete chat"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                          openConfirm(e, conversation.id);
+                        }
+                      }}
                     >
                       <Trash2Icon className="h-4 w-4" />
-                    </button>
+                    </div>
                   </div>
                 </button>
               ))}
