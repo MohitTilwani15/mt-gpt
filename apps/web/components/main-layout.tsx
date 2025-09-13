@@ -12,9 +12,10 @@ import { authClient } from "@/lib/auth-client"
 
 interface MainLayoutProps {
   children: React.ReactNode
+  headerActions?: React.ReactNode
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ children, headerActions }: MainLayoutProps) {
   const pathname = usePathname()
   const { data: session, isPending } = authClient.useSession()
   
@@ -40,6 +41,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <div className="flex-1" />
+          {headerActions}
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4">
           {children}

@@ -4,6 +4,7 @@ import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 import { MainLayout } from "@/components/main-layout"
 import SWRProvider from "@/components/swr-provider"
+import { ConditionalHeaderActions } from "@/components/conditional-header-actions"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -27,7 +28,9 @@ export default function RootLayout({
       >
         <Providers>
           <SWRProvider>
-            <MainLayout>{children}</MainLayout>
+            <MainLayout headerActions={<ConditionalHeaderActions />}>
+              {children}
+            </MainLayout>
           </SWRProvider>
         </Providers>
       </body>

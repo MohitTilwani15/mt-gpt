@@ -17,7 +17,6 @@ import ErrorBoundary from "@/components/error-boundary";
 import ChatHeader from "@/components/chat-header";
 import MessageList from "@/components/message-list";
 import ChatInput from "@/components/chat-input";
-import ConversationHistory from "@/components/conversation-history";
 import { useSelectedModel, useFileUpload } from "@/hooks/index";
 import { Button } from "@workspace/ui/components/button";
 
@@ -207,9 +206,7 @@ export default function ChatPage() {
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
-        <ChatHeader title="Chat" showBackButton={true} onBack={handleBack}>
-          <ConversationHistory />
-        </ChatHeader>
+        <ChatHeader title="Chat" showBackButton={true} onBack={handleBack} />
         
         <MessageList
           messages={messages}
