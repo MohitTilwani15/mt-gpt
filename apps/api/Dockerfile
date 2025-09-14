@@ -1,6 +1,9 @@
 # Base image
 FROM node:lts-alpine
 
+# Install pnpm
+RUN npm install -g pnpm
+
 # Create app directory
 WORKDIR /usr/src/app
 
