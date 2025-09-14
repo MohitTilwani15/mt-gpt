@@ -222,12 +222,13 @@ export class ChatService {
         //   }
         // }
 
-        let model;
-        if (selectedChatModel === 'grok-3-mini' || selectedChatModel === 'grok-3') {
-          model = xai(selectedChatModel);
-        } else {
-          model = openai(selectedChatModel || 'gpt-4o');
-        }
+        // let model;
+        // if (selectedChatModel === 'grok-3-mini' || selectedChatModel === 'grok-3') {
+        //   model = xai(selectedChatModel);
+        // } else {
+        //   model = openai(selectedChatModel || 'gpt-4o');
+        // }
+        let model = openai(selectedChatModel || 'gpt-4o');
 
         const systemPrompt = [this.getSystemPrompt(), additionalSystemContext]
           .filter(Boolean)
