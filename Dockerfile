@@ -15,7 +15,8 @@ COPY turbo.json ./
 
 # Copy all package.json files to establish workspace structure
 COPY apps/api/package.json ./apps/api/
-COPY packages/*/package.json ./packages/*/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
 
 # Install all dependencies (including workspace dependencies)
 RUN pnpm install --frozen-lockfile
