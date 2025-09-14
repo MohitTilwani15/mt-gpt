@@ -1,6 +1,5 @@
 "use client";
 
-import { v4 as uuidv4 } from "uuid";
 import {
   FormEventHandler,
   useState,
@@ -9,7 +8,7 @@ import {
   useCallback,
 } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, UIMessage } from "ai";
+import { UIMessage } from "ai";
 import { AIDevtools } from "ai-sdk-devtools";
 import { useRouter, useParams } from "next/navigation";
 
@@ -19,6 +18,7 @@ import MessageList from "@/components/message-list";
 import ChatInput from "@/components/chat-input";
 import { useSelectedModel, useFileUpload } from "@/hooks/index";
 import { Button } from "@workspace/ui/components/button";
+import { useSharedChatContext } from "@/providers/chat-context";
 
 interface UploadedFile {
   id: string;
@@ -29,6 +29,7 @@ interface UploadedFile {
 }
 
 export default function ChatPage() {
+  const { chat, setChatContext } = useSharedChatContext();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const chatId = params.id;
@@ -52,22 +53,7 @@ export default function ChatPage() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, status, setMessages, stop } = useChat({
-    generateId: () => uuidv4(),
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      prepareSendMessagesRequest({ messages }) {
-        const lastMessage = messages[messages.length - 1];
-          return {
-            body: {
-              id: chatId,
-              selectedChatModel: selectedModelRef.current,
-              message: lastMessage,
-            },
-          };
-      },
-    }),
-  });
+  const { messages, sendMessage, status, setMessages, stop } = useChat({ chat });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,6 +64,10 @@ export default function ChatPage() {
   }, [messages]);
 
   
+  useEffect(() => {
+    setChatContext({ chatId, selectedModel });
+  }, [chatId, selectedModel]);
+
   useEffect(() => {
     const loadChat = async () => {
       try {
@@ -209,8 +199,6 @@ export default function ChatPage() {
         <ChatHeader title="Chat" showBackButton={true} onBack={handleBack} />
         
         <MessageList
-          messages={messages}
-          status={status}
           chatId={chatId}
           onRegenerate={handleRegenerate}
         />
@@ -226,9 +214,6 @@ export default function ChatPage() {
           onFileUpload={handleFileUpload}
           onRemoveFile={removeFile}
           onSubmit={handleChatSubmit}
-          status={status}
-          setMessages={setMessages}
-          stop={stop}
         />
 
         {process.env.NEXT_PUBLIC_NODE_ENV === "development" &&

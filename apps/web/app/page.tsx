@@ -7,11 +7,11 @@ import {
   useCallback,
 } from "react";
 import { useRouter } from "next/navigation";
+import { UIMessage, FileUIPart } from "ai";
 
 import ErrorBoundary from "@/components/error-boundary";
 import ChatInput from "@/components/chat-input";
 import { useSelectedModel, createChat, useFileUpload } from "@/hooks/index";
-import { UIMessage, FileUIPart } from "ai";
 
 interface UploadedFile {
   id: string;
@@ -132,7 +132,6 @@ export default function Page() {
                 onFileUpload={handleFileUpload}
                 onRemoveFile={removeFile}
                 onSubmit={handleChatSubmit}
-                status="ready"
                 className="mx-auto"
               />
             </div>

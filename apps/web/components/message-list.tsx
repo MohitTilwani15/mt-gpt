@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useChat } from '@ai-sdk/react';
 import { BotIcon } from 'lucide-react';
 import { ChatStatus, UIMessage } from 'ai';
 import { useVotes, getVoteForMessage } from '@/hooks/use-votes';
@@ -15,6 +16,7 @@ import {
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import { Response } from '@workspace/ui/components/ui/shadcn-io/ai/response';
+import { useSharedChatContext } from '@/providers/chat-context'
 import { MessageReasoning } from './message-reasoning';
 import { MessageActions } from './message-actions';
 import DocumentAttachments from './document-attachments';
@@ -31,14 +33,16 @@ interface MessageDocument {
 }
 
 interface MessageListProps {
-  messages: UIMessage[];
-  status: ChatStatus;
   chatId: string;
   onRegenerate?: () => void;
 }
 
 
-export default function MessageList({ messages, status, chatId, onRegenerate }: MessageListProps) {
+export default function MessageList({ chatId, onRegenerate }: MessageListProps) {
+  const { chat } = useSharedChatContext();
+  const { messages, status } = useChat({
+    chat,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [previewDocument, setPreviewDocument] = useState<MessageDocument | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -101,7 +105,7 @@ export default function MessageList({ messages, status, chatId, onRegenerate }: 
                       if (type === "text") {
                         return (
                           <Response key={`${message.id}-${index}`}>
-                            {part.text}  
+                            {part.text}
                           </Response>
                         );
                       }

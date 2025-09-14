@@ -2,7 +2,6 @@
 
 import { useRef, FormEventHandler } from 'react';
 import { PaperclipIcon } from 'lucide-react';
-import { ChatStatus, UIMessage } from 'ai'
 
 import {
   PromptInput,
@@ -22,7 +21,8 @@ import { SUPPORTED_FILE_TYPES } from '@/lib/utils';
 import type { ChatModel } from '@/hooks/use-models';
 import { StopButton } from "@/components/stop-button";
 import TextInputAttachments from './text-input-attachments';
-import { UseChatHelpers } from '@ai-sdk/react';
+import { useChat } from '@ai-sdk/react';
+import { useSharedChatContext } from '@/providers/chat-context';
 
 interface UploadedFile {
   id: string;
@@ -43,10 +43,7 @@ interface ChatInputProps {
   onRemoveFile: (fileId: string) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
   isFileUploading: boolean;
-  status: ChatStatus;
   className?: string;
-  setMessages?: UseChatHelpers<UIMessage>['setMessages'];
-  stop?: () => void;
 }
 
 export default function ChatInput({
@@ -60,11 +57,10 @@ export default function ChatInput({
   onRemoveFile,
   onSubmit,
   isFileUploading,
-  status,
   className,
-  setMessages,
-  stop,
 }: ChatInputProps) {
+  const { chat } = useSharedChatContext();
+  const { status, setMessages, stop } = useChat({ chat });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {

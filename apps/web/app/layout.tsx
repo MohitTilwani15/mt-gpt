@@ -6,6 +6,7 @@ import { MainLayout } from "@/components/main-layout"
 import SWRProvider from "@/components/swr-provider"
 import { ConditionalHeaderActions } from "@/components/conditional-header-actions"
 import CommandK from "@/components/command-k"
+import { ChatProvider } from "@/providers/chat-context"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -29,10 +30,12 @@ export default function RootLayout({
       >
         <Providers>
           <SWRProvider>
-            <MainLayout headerActions={<ConditionalHeaderActions />}>
-              {children}
-              <CommandK />
-            </MainLayout>
+            <ChatProvider>
+              <MainLayout headerActions={<ConditionalHeaderActions />}>
+                {children}
+                <CommandK />
+              </MainLayout>
+            </ChatProvider>
           </SWRProvider>
         </Providers>
       </body>
