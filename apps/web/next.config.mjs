@@ -13,12 +13,14 @@ const nextConfig = {
     optimizePackageImports: ["lucide-react", "@workspace/ui"],
   },
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
-      },
-    ];
+    return {
+      beforeFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
+        },
+      ],
+    };
   },
 };
 
