@@ -152,6 +152,10 @@ export class ChatService {
     return chat;
   }
 
+  async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }) {
+    return this.messageQueryService.searchChatsByMessageTerm(params);
+  }
+
   async deleteChatById(chatId: string, session: UserSession) {
     const chat = await this.chatQueryService.getChatById({ id: chatId });
 

@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq, asc, gte, count, inArray } from 'drizzle-orm';
+import { and, eq, asc, gte, desc, sql } from 'drizzle-orm';
 import { UIMessage } from 'ai';
 
 import { ChatSDKError } from "../../lib/errors";
@@ -49,6 +49,45 @@ export class MessageQueryService {
       }
     });
   };
+
+  async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }) {
+    const { userId, term, limit = 10 } = params;
+
+    const likeValue = `%${term.toLowerCase()}%`;
+
+    // Search only text parts for messages that belong to user's chats
+    const rows = await this.db
+      .select({
+        chatId: chat.id,
+        title: chat.title,
+        createdAt: chat.createdAt,
+        messageId: message.id,
+        snippet: databaseSchema.parts.text_text,
+      })
+      .from(databaseSchema.parts)
+      .innerJoin(message, eq(databaseSchema.parts.messageId, message.id))
+      .innerJoin(chat, eq(message.chatId, chat.id))
+      .where(
+        and(
+          eq(chat.userId, userId),
+          eq(databaseSchema.parts.type, 'text'),
+          sql`LOWER(${databaseSchema.parts.text_text}) LIKE ${likeValue}`,
+        ),
+      )
+      .orderBy(desc(message.createdAt))
+      .limit(limit);
+
+    // Group by chat to provide one snippet per chat (latest match wins due to orderBy)
+    const seen = new Set<string>();
+    const unique = [] as Array<{ chatId: string; title: string | null; createdAt: Date; snippet: string | null }>;
+    for (const r of rows) {
+      if (seen.has(r.chatId)) continue;
+      seen.add(r.chatId);
+      unique.push({ chatId: r.chatId, title: r.title, createdAt: r.createdAt, snippet: r.snippet });
+    }
+
+    return unique;
+  }
 
   async getMessagesByChatIdPaginated({
     chatId,

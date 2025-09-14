@@ -56,28 +56,14 @@ export const useChats = (
 
   const url = `/api/chat?${params.toString()}`;
 
-  return useSWR<ChatResponse>(url, fetcher, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    shouldRetryOnError: false,
-    dedupingInterval: 30000,
-    errorRetryCount: 0,
-    ...config,
-  });
+  return useSWR<ChatResponse>(url, fetcher, { ...config });
 };
 
 export const useChat = (chatId: string | undefined, config?: SWRConfiguration) => {
   return useSWR<Chat>(
     chatId ? `/api/chat/${chatId}` : null,
     fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      shouldRetryOnError: false,
-      dedupingInterval: 30000,
-      errorRetryCount: 0,
-      ...config,
-    }
+    { ...config }
   );
 };
 

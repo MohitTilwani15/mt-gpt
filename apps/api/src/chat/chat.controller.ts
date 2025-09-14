@@ -168,6 +168,39 @@ export class ChatController {
     }
   }
 
+  @Get('search')
+  async searchChatsByMessage(
+    @Query('q') q: string,
+    @Query('limit') limitStr: string,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      const term = (q || '').trim();
+      if (!term || term.length < 2) {
+        return res.json({ results: [] });
+      }
+      const limit = Number.parseInt(limitStr || '10');
+      const results = await this.chatService.searchChatsByMessageTerm({
+        userId: session.user.id,
+        term,
+        limit,
+      });
+      return res.json({ results });
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({
+          error: error.type,
+          message: error.message,
+        });
+      }
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'offline:chat',
+        message: 'Failed to search chats',
+      });
+    }
+  }
+
   @Get(':id')
   async getChatById(
     @Param('id') id: string,
