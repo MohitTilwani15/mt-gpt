@@ -4,22 +4,22 @@ import { UIMessage } from 'ai';
 
 export enum ChatModel {
   GPT_4O = 'gpt-4o',
-  CLAUDE_3_5_SONNET = 'claude-3-5-sonnet-20241022',
-  GEMINI_1_5_PRO = 'gemini-1.5-pro',
+  // CLAUDE_3_5_SONNET = 'claude-3-5-sonnet-20241022',
+  // GEMINI_1_5_PRO = 'gemini-1.5-pro',
   O4_MINI = 'o4-mini',
   O3_MINI = 'o3-mini',
-  GROK_3_MINI = 'grok-3-mini',
-  GROK_3 = 'grok-3',
+  // GROK_3_MINI = 'grok-3-mini',
+  // GROK_3 = 'grok-3',
 }
 
 export const CHAT_MODEL_NAMES: Record<ChatModel, string> = {
   [ChatModel.GPT_4O]: 'GPT-4o',
-  [ChatModel.CLAUDE_3_5_SONNET]: 'Claude 3.5 Sonnet',
-  [ChatModel.GEMINI_1_5_PRO]: 'Gemini 1.5 Pro',
+  // [ChatModel.CLAUDE_3_5_SONNET]: 'Claude 3.5 Sonnet',
+  // [ChatModel.GEMINI_1_5_PRO]: 'Gemini 1.5 Pro',
   [ChatModel.O4_MINI]: 'O4 Mini (Reasoning)',
   [ChatModel.O3_MINI]: 'O3 Mini (Reasoning)',
-  [ChatModel.GROK_3_MINI]: 'Grok 3 Mini',
-  [ChatModel.GROK_3]: 'Grok 3',
+  // [ChatModel.GROK_3_MINI]: 'Grok 3 Mini',
+  // [ChatModel.GROK_3]: 'Grok 3',
 };
 
 export class ChatMessagePart {
