@@ -7,8 +7,8 @@ RUN npm install -g pnpm
 # Create app directory
 WORKDIR /usr/src/app
 
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
-COPY package*.json ./
+# Copy package files and lockfile
+COPY package*.json pnpm-lock.yaml ./
 
 # Install app dependencies
 RUN pnpm install --frozen-lockfile
