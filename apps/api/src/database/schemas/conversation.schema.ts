@@ -16,6 +16,7 @@ export const chat = pgTable('Chat', {
     .notNull()
     .references(() => user.id),
   lastContext: jsonb('lastContext').$type<LanguageModelV2Usage | null>(),
+  isPublic: boolean('isPublic').notNull().default(false),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

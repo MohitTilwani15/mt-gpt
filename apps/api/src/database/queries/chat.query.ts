@@ -147,4 +147,13 @@ export class ChatQueryService {
       throw new ChatSDKError('bad_request:database', 'Failed to delete chat');
     }
   }
+
+  async updateChatVisibilityById({ id, isPublic }: { id: string; isPublic: boolean }) {
+    try {
+      await this.db.update(chat).set({ isPublic }).where(eq(chat.id, id));
+      return { id, isPublic };
+    } catch (error) {
+      throw new ChatSDKError('bad_request:database', 'Failed to update chat visibility');
+    }
+  }
 }
