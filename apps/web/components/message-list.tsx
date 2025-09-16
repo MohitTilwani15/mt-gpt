@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { BotIcon } from 'lucide-react';
-import { ChatStatus, UIMessage } from 'ai';
+import { Streamdown } from 'streamdown';
 import { useVotes, getVoteForMessage } from '@/hooks/use-votes';
 
 import {
@@ -15,7 +15,6 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
-import { Response } from '@workspace/ui/components/ui/shadcn-io/ai/response';
 import { useSharedChatContext } from '@/providers/chat-context'
 import { MessageReasoning } from './message-reasoning';
 import { MessageActions } from './message-actions';
@@ -104,9 +103,9 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
                       }
                       if (type === "text") {
                         return (
-                          <Response key={`${message.id}-${index}`}>
+                          <Streamdown key={`${message.id}-${index}`}>
                             {part.text}
-                          </Response>
+                          </Streamdown>
                         );
                       }
                       return null;
