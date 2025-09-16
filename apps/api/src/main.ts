@@ -60,7 +60,8 @@ async function bootstrap() {
       'http://localhost:3001', // Local web
       'https://localhost:3000', // Local word add-in
       'https://mt-gpt-web.vercel.app'
-    ]
+    ],
+    credentials: true,
   });
   await app.listen(3000);
 }
