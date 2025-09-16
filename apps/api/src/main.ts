@@ -55,7 +55,13 @@ async function bootstrap() {
   expressApp.use(require('express').json());
 
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors({
+    origin: [
+      'http://localhost:3001', // Local web
+      'https://localhost:3000', // Local word add-in
+      'https://mt-gpt-web.vercel.app'
+    ]
+  });
   await app.listen(3000);
 }
 bootstrap();
