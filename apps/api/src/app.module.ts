@@ -23,8 +23,9 @@ import { AppController } from './app.controller';
           }),
           trustedOrigins: [configService.getOrThrow('FRONTEND_URL'), 'https://localhost:3000'],
           advanced: {
-            useSecureCookies: true,
-            cookieAttributes: {
+            defaultCookieAttributes: {
+              secure: true,
+              httpOnly: true,
               sameSite: 'none',
             },
           },
