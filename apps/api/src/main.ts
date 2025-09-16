@@ -39,6 +39,15 @@ async function bootstrap() {
   // Disable NestJS's built-in body parser so we can control ordering
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
+  app.enableCors({
+    origin: [
+      'http://localhost:3001', // Local web
+      'https://localhost:3000', // Local word add-in
+      'https://mt-gpt-web.vercel.app'
+    ],
+    credentials: true,
+  });
+
   // Access Express instance
   const expressApp = app.getHttpAdapter().getInstance();
 
@@ -55,14 +64,6 @@ async function bootstrap() {
   expressApp.use(require('express').json());
 
   app.setGlobalPrefix('api');
-  app.enableCors({
-    origin: [
-      'http://localhost:3001', // Local web
-      'https://localhost:3000', // Local word add-in
-      'https://mt-gpt-web.vercel.app'
-    ],
-    credentials: true,
-  });
   await app.listen(3000);
 }
 bootstrap();
