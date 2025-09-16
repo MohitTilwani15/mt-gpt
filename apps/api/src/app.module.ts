@@ -22,6 +22,12 @@ import { AppController } from './app.controller';
             provider: 'pg',
           }),
           trustedOrigins: [configService.getOrThrow('FRONTEND_URL'), 'https://localhost:3000'],
+          advanced: {
+            useSecureCookies: true,
+            cookieAttributes: {
+              sameSite: 'none',
+            },
+          },
           emailAndPassword: {
             enabled: true,
           },
