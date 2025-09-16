@@ -55,6 +55,7 @@ async function bootstrap() {
   expressApp.use(require('express').json());
 
   app.setGlobalPrefix('api');
+  app.enableCors();
   await app.listen(3000);
 }
 bootstrap();
