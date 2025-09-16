@@ -21,7 +21,7 @@ import { AppController } from './app.controller';
           database: drizzleAdapter(database, {
             provider: 'pg',
           }),
-          trustedOrigins: [configService.getOrThrow('FRONTEND_URL')],
+          trustedOrigins: [configService.getOrThrow('FRONTEND_URL'), 'https://localhost:3000'],
           emailAndPassword: {
             enabled: true,
           },
