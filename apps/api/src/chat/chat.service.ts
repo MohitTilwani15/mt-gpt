@@ -186,6 +186,20 @@ export class ChatService {
     return await this.chatQueryService.updateChatVisibilityById({ id: chatId, isPublic });
   }
 
+  async updateChatArchiveStateById(chatId: string, isArchived: boolean, session: UserSession) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId });
+
+    if (!chat) {
+      throw new ChatSDKError('not_found:chat');
+    }
+
+    if (chat.userId !== session.user.id) {
+      throw new ChatSDKError('forbidden:chat');
+    }
+
+    return await this.chatQueryService.updateChatArchiveStateById({ id: chatId, isArchived });
+  }
+
   private async generateAIResponse({
     chatId,
     messages,

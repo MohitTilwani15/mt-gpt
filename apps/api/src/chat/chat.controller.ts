@@ -344,6 +344,27 @@ export class ChatController {
     }
   }
 
+  @Patch(':id/archive')
+  async updateArchive(
+    @Param('id') id: string,
+    @Body() body: { isArchived: boolean },
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      if (typeof body?.isArchived !== 'boolean') {
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'bad_request:api', message: 'isArchived must be boolean' });
+      }
+      const result = await this.chatService.updateChatArchiveStateById(id, body.isArchived, session);
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({ error: error.type, message: error.message });
+      }
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'offline:chat', message: 'Internal server error' });
+    }
+  }
+
   private getHttpStatus(errorCode: string): number {
     const statusMap: Record<string, number> = {
       'bad_request:api': HttpStatus.BAD_REQUEST,

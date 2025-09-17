@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { HistoryIcon, Trash2Icon } from 'lucide-react';
+import { HistoryIcon, Trash2Icon, MoreVerticalIcon, Share2Icon, ArchiveIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import { useChats } from '@/hooks/use-chat';
 import {
   Sheet,
@@ -13,8 +14,9 @@ import {
   SheetTrigger,
 } from '@workspace/ui/components/sheet';
 import { Button } from '@workspace/ui/components/button';
-import { deleteChat as deleteChatApi } from '@/hooks/use-chat';
+import { deleteChat as deleteChatApi, updateChatVisibility, archiveChat } from '@/hooks/use-chat';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover';
 
 interface ConversationHistoryProps {
   trigger?: React.ReactNode;
@@ -24,6 +26,7 @@ interface ConversationHistoryProps {
 export default function ConversationHistory({ trigger, onChatSelect }: ConversationHistoryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -59,6 +62,50 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
       }
     } catch (err) {
       console.error('Delete chat failed', err);
+      toast.error('Failed to delete chat');
+    }
+  };
+
+  const handleShare = async (conversationId: string, isAlreadyPublic?: boolean) => {
+    try {
+      if (!isAlreadyPublic) {
+        await updateChatVisibility(conversationId, true);
+        await mutate();
+      }
+
+      const shareUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/chat/${conversationId}`
+        : `/chat/${conversationId}`;
+
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ url: shareUrl });
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Share link copied to clipboard');
+      } else {
+        toast.success('Share link ready');
+      }
+    } catch (err) {
+      console.error('Share chat failed', err);
+      toast.error('Failed to share chat');
+    } finally {
+      setOpenMenuId(null);
+    }
+  };
+
+  const handleArchive = async (conversationId: string) => {
+    try {
+      await archiveChat(conversationId, true);
+      await mutate();
+      toast.success('Chat archived');
+      if (pathname === `/chat/${conversationId}`) {
+        router.push('/');
+      }
+    } catch (err) {
+      console.error('Archive chat failed', err);
+      toast.error('Failed to archive chat');
+    } finally {
+      setOpenMenuId(null);
     }
   };
 
@@ -118,42 +165,99 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
             </div>
           ) : (
             <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  onClick={() => handleChatSelect(conversation.id)}
-                  className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm mb-1 truncate">
-                        {conversation.title || 'Untitled Conversation'}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(conversation.createdAt)}
-                      </p>
-                    </div>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openConfirm(e, conversation.id);
-                      }}
-                      className="shrink-0 p-2 rounded hover:bg-muted text-muted-foreground cursor-pointer"
-                      aria-label="Delete chat"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.stopPropagation();
-                          openConfirm(e, conversation.id);
-                        }
-                      }}
-                    >
-                      <Trash2Icon className="h-4 w-4" />
+              {conversations.map((conversation) => {
+                const isMenuOpen = openMenuId === conversation.id;
+                return (
+                  <div
+                    key={conversation.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleChatSelect(conversation.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleChatSelect(conversation.id);
+                      }
+                    }}
+                    className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm mb-1 truncate">
+                          {conversation.title || 'Untitled Conversation'}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(conversation.createdAt)}
+                        </p>
+                      </div>
+                      <Popover
+                        open={isMenuOpen}
+                        onOpenChange={(open) => setOpenMenuId(open ? conversation.id : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Chat actions"
+                          >
+                            <MoreVerticalIcon className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-44 p-1"
+                          align="end"
+                          sideOffset={6}
+                          onOpenAutoFocus={(event) => event.preventDefault()}
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(conversation.id, conversation.isPublic);
+                            }}
+                          >
+                            <Share2Icon className="h-4 w-4" />
+                            Share
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleArchive(conversation.id);
+                            }}
+                          >
+                            <ArchiveIcon className="h-4 w-4" />
+                            Archive
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2 text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              openConfirm(e, conversation.id);
+                            }}
+                          >
+                            <Trash2Icon className="h-4 w-4" />
+                            Delete
+                          </Button>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

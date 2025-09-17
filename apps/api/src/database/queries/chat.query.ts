@@ -56,8 +56,8 @@ export class ChatQueryService {
           .from(chat)
           .where(
             whereCondition
-              ? and(whereCondition, eq(chat.userId, id))
-              : eq(chat.userId, id),
+              ? and(eq(chat.userId, id), eq(chat.isArchived, false), whereCondition)
+              : and(eq(chat.userId, id), eq(chat.isArchived, false)),
           )
           .orderBy(desc(chat.createdAt))
           .limit(extendedLimit);
@@ -154,6 +154,15 @@ export class ChatQueryService {
       return { id, isPublic };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to update chat visibility');
+    }
+  }
+
+  async updateChatArchiveStateById({ id, isArchived }: { id: string; isArchived: boolean }) {
+    try {
+      await this.db.update(chat).set({ isArchived }).where(eq(chat.id, id));
+      return { id, isArchived };
+    } catch (error) {
+      throw new ChatSDKError('bad_request:database', 'Failed to update chat archive state');
     }
   }
 }

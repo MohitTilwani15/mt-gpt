@@ -1,4 +1,6 @@
+import { Chat } from '../../database/schemas/conversation.schema';
+
 export interface ChatResponse {
-  chats: any[];
+  chats: Chat[];
   hasMore: boolean;
 }

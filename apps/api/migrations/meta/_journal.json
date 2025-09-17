@@ -43,6 +43,13 @@
       "when": 1757889393087,
       "tag": "0005_clammy_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1758108992762,
+      "tag": "0006_melted_kulan_gath",
+      "breakpoints": true
     }
   ]
 }

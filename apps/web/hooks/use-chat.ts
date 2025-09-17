@@ -1,17 +1,5 @@
 import useSWR, { SWRConfiguration } from 'swr';
 
-export interface ChatResponse {
-  chats: Array<{
-    id: string;
-    title: string;
-    userId: string;
-    createdAt: string;
-    updatedAt: string;
-  }>;
-  hasMore: boolean;
-  nextCursor?: string;
-}
-
 export interface CreateChatRequest {
   id: string;
 }
@@ -23,6 +11,13 @@ export interface Chat {
   createdAt: string;
   updatedAt: string;
   isPublic?: boolean;
+  isArchived?: boolean;
+}
+
+export interface ChatResponse {
+  chats: Chat[];
+  hasMore: boolean;
+  nextCursor?: string;
 }
 
 const fetcher = async (url: string) => {
@@ -108,4 +103,38 @@ export const deleteChat = async (chatId: string): Promise<{ id: string; deleted:
   } catch {
     return;
   }
+};
+
+export const updateChatVisibility = async (chatId: string, isPublic: boolean) => {
+  const response = await fetch(`/api/chat/${chatId}/visibility`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ isPublic }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update chat visibility');
+  }
+
+  return await response.json();
+};
+
+export const archiveChat = async (chatId: string, isArchived: boolean = true) => {
+  const response = await fetch(`/api/chat/${chatId}/archive`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ isArchived }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update chat archive status');
+  }
+
+  return await response.json();
 };
