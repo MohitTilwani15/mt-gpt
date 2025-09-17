@@ -12,6 +12,7 @@ import { DocumentQueryService } from 'src/database/queries/document.query';
 import { VoteQueryService } from 'src/database/queries/vote.query';
 import { DatabaseModule } from 'src/database/database.module';
 import { LinkUpSoWebSearchToolService } from 'src/lib/tools/linkup-so-web-search.tool';
+import { CloudflareAIGatewayService } from 'src/services/cloudflare-ai-gateway.service';
 import { MemoryService } from './services/memory.service';
 import { Mem0MemoryService } from './services/mem0-memory.service';
 
@@ -22,6 +23,7 @@ import { Mem0MemoryService } from './services/mem0-memory.service';
     ChatService,
     FileDocumentService,
     CloudflareR2Service,
+    CloudflareAIGatewayService,
     ChatQueryService,
     MessageQueryService,
     DocumentQueryService,

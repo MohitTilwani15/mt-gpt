@@ -21,5 +21,14 @@
   "packageManager": "pnpm@10.4.1",
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "langium@*": {
+        "dependencies": {
+          "vscode-jsonrpc": "^8.2.0"
+        }
+      }
+    }
   }
 }

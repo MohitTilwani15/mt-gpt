@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-LN/IogHuEpYNmJkMR8cUH4KjZijxlUWHLfTbiKvBGHQ=
+
 importers:
 
   .:
@@ -71,6 +73,9 @@ importers:
       ai:
         specifier: ^5.0.40
         version: 5.0.40(zod@4.1.8)
+      ai-gateway-provider:
+        specifier: ^2.0.0
+        version: 2.0.0(zod@4.1.8)
       better-auth:
         specifier: ^1.3.9
         version: 1.3.9(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -5772,6 +5777,9 @@ packages:
   aggregate-error@5.0.0:
     resolution: {integrity: sha512-gOsf2YwSlleG6IjRYG2A7k0HmBMEo6qVNk9Bp/EaLgAJT5ngH6PXbqa4ItvnEwCm/velL5jAnQgsHsWnjhGmvw==}
     engines: {node: '>=18'}
+
+  ai-gateway-provider@2.0.0:
+    resolution: {integrity: sha512-QjyQRSR+NEQU+5KeiAI9QC6s65eIGPIdaiVfkBMfDPPbYiXLcqchYK4Z4IUqlgKDE8+7Te2BdcXYq7dEcudViQ==}
 
   ai-sdk-devtools@0.4.0:
     resolution: {integrity: sha512-MMkwQkXgW6JTeFCma/+h1ujsCTgOlzCq6SqP4dDNtIyHmy32NLf0xTDiF4eq2x76WA0YddllRzcr8MqcLcQGkg==}
@@ -19719,6 +19727,14 @@ snapshots:
       clean-stack: 5.2.0
       indent-string: 5.0.0
 
+  ai-gateway-provider@2.0.0(zod@4.1.8):
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.8(zod@4.1.8)
+      ai: 5.0.40(zod@4.1.8)
+    transitivePeerDependencies:
+      - zod
+
   ai-sdk-devtools@0.4.0(@ai-sdk/react@2.0.29(react@19.1.1)(zod@4.1.8))(@types/react@19.1.9)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(zod@4.1.8):
     dependencies:
       '@ai-sdk/react': 2.0.29(react@19.1.1)(zod@4.1.8)
@@ -23699,6 +23715,7 @@ snapshots:
     dependencies:
       chevrotain: 11.0.3
       chevrotain-allstar: 0.3.1(chevrotain@11.0.3)
+      vscode-jsonrpc: 8.2.0
       vscode-languageserver: 9.0.1
       vscode-languageserver-textdocument: 1.0.12
       vscode-uri: 3.0.8

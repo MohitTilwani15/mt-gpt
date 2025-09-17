@@ -11,7 +11,6 @@ import {
   LanguageModelUsage,
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { xai } from '@ai-sdk/xai';
 import { UserSession } from '@mguay/nestjs-better-auth';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
@@ -32,6 +31,7 @@ import { databaseSchema } from 'src/database/schemas';
 import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
 import { LinkUpSoWebSearchToolService } from '../lib/tools/linkup-so-web-search.tool'
 import { Mem0MemoryService } from './services/mem0-memory.service';
+import { CloudflareAIGatewayService } from 'src/services/cloudflare-ai-gateway.service';
 
 @Injectable()
 export class ChatService {
@@ -43,6 +43,7 @@ export class ChatService {
     private readonly db: NodePgDatabase<typeof databaseSchema>,
     private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService,
     private readonly mem0MemoryService: Mem0MemoryService,
+    private readonly cloudflareAIGatewayService: CloudflareAIGatewayService,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
@@ -242,14 +243,13 @@ export class ChatService {
         // } else {
         //   model = openai(selectedChatModel || 'gpt-4o');
         // }
-        let model = openai(selectedChatModel || 'gpt-4o');
 
         const systemPrompt = [this.getSystemPrompt(), additionalSystemContext]
           .filter(Boolean)
           .join('');
 
         const result = streamText({
-          model,
+          model: this.cloudflareAIGatewayService.aigateway([openai(selectedChatModel || 'gpt-4o')]),
           system: systemPrompt,
           messages: convertToModelMessages(messages),
           stopWhen: stepCountIs(5),
