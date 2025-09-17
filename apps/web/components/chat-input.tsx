@@ -116,7 +116,7 @@ export default function ChatInput({
               </PromptInputModelSelectContent>
             </PromptInputModelSelect>
           </PromptInputTools>
-          {status === 'streaming' && stop && setMessages ? (
+          {status === 'streaming' ? (
             <StopButton stop={stop} setMessages={setMessages} />
           ) : (
             <PromptInputSubmit
