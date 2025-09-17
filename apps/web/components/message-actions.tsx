@@ -99,11 +99,11 @@ export function MessageActions({
   const showVoteButtons = message.role === 'assistant';
 
   return (
-    <div className={`flex items-center gap-1 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+        className="h-8 w-8"
         onClick={handleCopy}
         title={message.role === 'user' ? "Copy your message" : "Copy response"}
       >
@@ -114,7 +114,7 @@ export function MessageActions({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+          className="h-8 w-8"
           onClick={handleRegenerate}
           disabled={isRegenerating}
           title="Regenerate response"
@@ -128,7 +128,7 @@ export function MessageActions({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+            className="h-8 w-8"
             onClick={() => handleVote('up')}
             disabled={isVoting || vote?.isUpvoted}
             title={vote?.isUpvoted ? 'Already upvoted' : 'Upvote response'}
@@ -139,7 +139,7 @@ export function MessageActions({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-0 group-hover/message:opacity-100 transition-opacity"
+            className="h-8 w-8"
             onClick={() => handleVote('down')}
             disabled={isVoting || !!(vote && !vote.isUpvoted)}
             title={vote && !vote.isUpvoted ? 'Already downvoted' : 'Downvote response'}

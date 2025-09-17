@@ -83,55 +83,61 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
               </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <Message key={message.id} from={message.role} className="group/message">
-                <MessageContent>
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      {message.parts.map((part, index) => {
-                      const { type } = part;
-                      const key = `message-${message.id}-part-${index}`;
+            messages.map((message) => {
+              const alignmentClass = message.role === 'user' ? 'justify-end' : 'justify-start';
+              const vote = getVoteForMessage(votes, message.id);
 
-                      if (type === "reasoning" && part.text?.trim().length > 0) {
-                        return (
-                          <MessageReasoning
-                            key={key}
-                            isLoading={status === 'streaming'}
-                            reasoning={part.text}
-                          />
-                        );
-                      }
-                      if (type === "text") {
-                        return (
-                          <Streamdown key={`${message.id}-${index}`}>
-                            {part.text}
-                          </Streamdown>
-                        );
-                      }
-                      return null;
-                    })}
-                    </div>
-                    
-                    <div className="flex-shrink-0 ml-2">
-                      <MessageActions
-                        chatId={chatId}
+              return (
+                <div key={message.id} className="space-y-2">
+                  <Message from={message.role} className="group/message py-0">
+                    <MessageContent>
+                      <div className="space-y-3">
+                        {message.parts.map((part, index) => {
+                          const { type } = part;
+                          const key = `message-${message.id}-part-${index}`;
+
+                          if (type === "reasoning" && part.text?.trim().length > 0) {
+                            return (
+                              <MessageReasoning
+                                key={key}
+                                isLoading={status === 'streaming'}
+                                reasoning={part.text}
+                              />
+                            );
+                          }
+                          if (type === "text") {
+                            return (
+                              <Streamdown key={`${message.id}-${index}`}>
+                                {part.text}
+                              </Streamdown>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+
+                      <DocumentAttachments
                         message={message}
-                        vote={getVoteForMessage(votes, message.id)}
-                        isLoading={status === 'streaming'}
-                        status={status}
-                        onRegenerate={onRegenerate}
+                        onPreview={handleDocumentPreview}
                       />
-                    </div>
-                  </div>
+                    </MessageContent>
+                  </Message>
 
-                  <DocumentAttachments
-                    message={message}
-                    onPreview={handleDocumentPreview}
-                  />
-                </MessageContent>
-              </Message>
-            )
-          ))}
+                  <div className={`flex ${alignmentClass}`}>
+                    <MessageActions
+                      chatId={chatId}
+                      message={message}
+                      vote={vote}
+                      isLoading={status === 'streaming'}
+                      status={status}
+                      onRegenerate={onRegenerate}
+                      className="pt-1"
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
           <div ref={messagesEndRef} />
         </ConversationContent>
         <ConversationScrollButton />
