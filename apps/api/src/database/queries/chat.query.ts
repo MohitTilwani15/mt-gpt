@@ -25,12 +25,24 @@ export class ChatQueryService {
     title?: string;
   }) {
     try {
-      return await this.db.insert(chat).values({
-        id,
-        userId,
-        title,
-        createdAt: new Date(),
-      });
+      const [chatRow] = await this.db
+        .insert(chat)
+        .values({
+          id,
+          userId,
+          title,
+          createdAt: new Date(),
+        })
+        .returning({
+          id: chat.id,
+          title: chat.title,
+          userId: chat.userId,
+          createdAt: chat.createdAt,
+          isPublic: chat.isPublic,
+          isArchived: chat.isArchived,
+        });
+
+      return chatRow;
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to save chat');
     }

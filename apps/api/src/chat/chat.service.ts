@@ -55,7 +55,7 @@ export class ChatService {
     }
 
     return this.db.transaction(async (transaction) => {
-      if (existingChat && !existingChat.title) {
+      if (existingChat && existingChat.title === 'New Chat') {
         const title = await this.generateTitleFromUserMessage(
           message.parts
             .filter((part) => part.type === 'text')
@@ -125,17 +125,17 @@ export class ChatService {
   }
 
   async createNewChat(chatId: string, session: UserSession) {
-    await this.chatQueryService.createChat({
+    const chat = await this.chatQueryService.createChat({
       id: chatId,
       userId: session.user.id,
       title: 'New Chat',
     });
 
     return {
-      id: chatId,
-      title: 'New Chat',
+      id: chat.id,
+      title: chat.title,
       userId: session.user.id,
-      createdAt: new Date(),
+      createdAt: chat.createdAt,
     };
   }
 
