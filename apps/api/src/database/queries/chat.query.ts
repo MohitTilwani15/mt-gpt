@@ -177,4 +177,13 @@ export class ChatQueryService {
       throw new ChatSDKError('bad_request:database', 'Failed to update chat archive state');
     }
   }
+
+  async updateChatTitleById({ id, title }: { id: string; title: string }) {
+    try {
+      await this.db.update(chat).set({ title }).where(eq(chat.id, id));
+      return { id, title };
+    } catch (error) {
+      throw new ChatSDKError('bad_request:database', 'Failed to update chat title');
+    }
+  }
 }

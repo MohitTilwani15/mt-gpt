@@ -54,24 +54,16 @@ export class ChatService {
       throw new ChatSDKError('forbidden:chat');
     }
 
-    return this.db.transaction(async (transaction) => {
-      if (existingChat && existingChat.title === 'New Chat') {
-        const title = await this.generateTitleFromUserMessage(
-          message.parts
-            .filter((part) => part.type === 'text')
-            .map((part) => part.text)
-            .join(' '),
-        );
+    const userQueryText = this.extractTextFromParts(message.parts || []);
+    const shouldGenerateTitle = Boolean(
+      existingChat && existingChat.title === 'New Chat' && userQueryText.trim(),
+    );
 
-        await transaction.update(databaseSchema.chat)
-          .set({ title })
-          .where(eq(databaseSchema.chat.id, id));
-      }
-
-      await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message })
+    const stream = await this.db.transaction(async (transaction) => {
+      await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message });
 
       const dbMessages = await transaction.query.message.findMany({
-        where: eq(databaseSchema.message.chatId, existingChat.id),
+        where: eq(databaseSchema.message.chatId, id),
         with: {
           parts: {
             orderBy: (parts, { asc }) => [asc(parts.order)],
@@ -87,14 +79,12 @@ export class ChatService {
         parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
       }));
 
-      const userQueryText = this.extractTextFromParts(message.parts || []);
-
       let memoryContext = '';
       try {
         memoryContext = await this.mem0MemoryService.getMemoryContext(
           session.user.id,
           userQueryText,
-          5
+          5,
         );
       } catch (err) {
         console.warn('Memory retrieval failed', err);
@@ -111,6 +101,12 @@ export class ChatService {
         enableReasoning: Boolean(enableReasoning),
       });
     });
+
+    if (shouldGenerateTitle) {
+      void this.generateChatTitleInBackground({ chatId: id, userQueryText });
+    }
+
+    return stream;
   }
 
   async getChats(
@@ -414,6 +410,27 @@ export class ChatService {
     });
 
     return stream;
+  }
+
+  private async generateChatTitleInBackground({
+    chatId,
+    userQueryText,
+  }: {
+    chatId: string;
+    userQueryText: string;
+  }) {
+    try {
+      const title = await this.generateTitleFromUserMessage(userQueryText);
+      const trimmed = title.trim();
+
+      if (!trimmed) {
+        return;
+      }
+
+      await this.chatQueryService.updateChatTitleById({ id: chatId, title: trimmed });
+    } catch (error) {
+      console.warn('Failed to generate chat title in background', chatId, error);
+    }
   }
 
   private async generateTitleFromUserMessage(message: string) {
