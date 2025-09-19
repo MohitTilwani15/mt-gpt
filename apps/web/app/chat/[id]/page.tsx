@@ -19,6 +19,8 @@ import ChatInput from "@/components/chat-input";
 import { useSelectedModel, useFileUpload } from "@/hooks/index";
 import { Button } from "@workspace/ui/components/button";
 import { useSharedChatContext } from "@/providers/chat-context";
+import { useChat as useChatDetails } from "@/hooks/use-chat";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 
 interface UploadedFile {
   id: string;
@@ -33,6 +35,16 @@ export default function ChatPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const chatId = params.id;
+
+  const { data: chatDetails, isLoading: isChatLoading } = useChatDetails(chatId, {
+    revalidateOnFocus: false,
+  });
+  const chatTitle = chatDetails?.title?.trim() ? chatDetails.title : null;
+  const chatHeaderTitle = isChatLoading ? (
+    <Skeleton className="h-6 w-32" />
+  ) : (
+    chatTitle || "New Chat"
+  );
   
   const [text, setText] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -196,7 +208,7 @@ export default function ChatPage() {
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
-        <ChatHeader title="Chat" showBackButton={true} onBack={handleBack} />
+        <ChatHeader title={chatHeaderTitle} showBackButton={true} onBack={handleBack} />
         
         <MessageList
           chatId={chatId}

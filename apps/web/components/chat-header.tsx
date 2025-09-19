@@ -1,13 +1,14 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Button } from '@workspace/ui/components/button';
 import { ArrowLeftIcon } from 'lucide-react';
 
 interface ChatHeaderProps {
-  title: string;
+  title: ReactNode;
   showBackButton?: boolean;
   onBack?: () => void;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
 export default function ChatHeader({ 
