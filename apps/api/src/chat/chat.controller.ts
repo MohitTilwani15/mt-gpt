@@ -50,6 +50,13 @@ export class ChatController {
       req.on('close', abort);
       res.on('close', abort);
 
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      if (typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+      }
+
       const result = await this.chatService.createChat(body, session, ac.signal);
       const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
       const nodeReadable = Readable.fromWeb(webSseStream);

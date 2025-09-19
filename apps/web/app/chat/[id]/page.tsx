@@ -221,6 +221,8 @@ export default function ChatPage() {
     );
   }
 
+  const showDevtools = process.env.NODE_ENV === "development";
+
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -258,7 +260,7 @@ export default function ChatPage() {
           onSubmit={handleChatSubmit}
         />
 
-        {process.env.NEXT_PUBLIC_NODE_ENV === "development" &&
+        {showDevtools &&
           <AIDevtools
             enabled={true}
             maxEvents={1000}
