@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { BotIcon } from 'lucide-react';
 import { Streamdown } from 'streamdown';
-import { useVotes, getVoteForMessage } from '@/hooks/use-votes';
+import { useVotes } from '@/hooks/use-votes';
+import type { Vote } from '@/hooks/use-votes';
+import type { MessageDocument } from '@/types/chat';
 
 import {
   Message,
@@ -15,21 +17,11 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
-import { useSharedChatContext } from '@/providers/chat-context'
+import { useSharedChatContext } from '@/providers/chat-context';
 import { MessageReasoning } from './message-reasoning';
 import { MessageActions } from './message-actions';
 import DocumentAttachments from './document-attachments';
 import DocumentPreview from './document-preview';
-
-interface MessageDocument {
-  id: string;
-  fileName?: string;
-  fileSize?: number;
-  mimeType: string;
-  text?: string;
-  downloadUrl: string;
-  createdAt?: string;
-}
 
 interface MessageListProps {
   chatId: string;
@@ -48,14 +40,27 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
 
   const { data: votes } = useVotes(chatId);
 
-  
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const votesByMessageId = useMemo(() => {
+    if (!votes) {
+      return new Map<string, Vote>();
+    }
+
+    return new Map<string, Vote>(votes.map((vote) => [vote.messageId, vote]));
+  }, [votes]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length === 0) {
+      return;
+    }
+
+    scrollToBottom(messages.length === 1 ? 'auto' : 'smooth');
+  }, [messages, scrollToBottom]);
+
+  const isStreaming = status === 'streaming';
 
   const handleDocumentPreview = useCallback((document: MessageDocument) => {
     setPreviewDocument(document);
@@ -85,7 +90,7 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
           ) : (
             messages.map((message) => {
               const alignmentClass = message.role === 'user' ? 'justify-end' : 'justify-start';
-              const vote = getVoteForMessage(votes, message.id);
+              const vote = votesByMessageId.get(message.id) ?? null;
 
               return (
                 <div key={message.id} className="space-y-2">
@@ -93,25 +98,26 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
                     <MessageContent>
                       <div className="space-y-3">
                         {message.parts.map((part, index) => {
-                          const { type } = part;
-                          const key = `message-${message.id}-part-${index}`;
+                          const partKey = `message-${message.id}-part-${index}`;
 
-                          if (type === "reasoning" && part.text?.trim().length > 0) {
+                          if (part.type === 'reasoning' && part.text?.trim()) {
                             return (
                               <MessageReasoning
-                                key={key}
-                                isLoading={status === 'streaming'}
+                                key={partKey}
+                                isLoading={isStreaming}
                                 reasoning={part.text}
                               />
                             );
                           }
-                          if (type === "text") {
+
+                          if (part.type === 'text' && part.text) {
                             return (
-                              <Streamdown key={`${message.id}-${index}`}>
+                              <Streamdown key={partKey}>
                                 {part.text}
                               </Streamdown>
                             );
                           }
+
                           return null;
                         })}
                       </div>
@@ -128,7 +134,7 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
                       chatId={chatId}
                       message={message}
                       vote={vote}
-                      isLoading={status === 'streaming'}
+                      isLoading={isStreaming}
                       status={status}
                       onRegenerate={onRegenerate}
                       className="pt-1"

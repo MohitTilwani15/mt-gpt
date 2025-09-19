@@ -39,8 +39,7 @@ export class ChatService {
     private readonly chatQueryService: ChatQueryService,
     private readonly messageQueryService: MessageQueryService,
     private readonly voteQueryService: VoteQueryService,
-    @Inject(DATABASE_CONNECTION)
-    private readonly db: NodePgDatabase<typeof databaseSchema>,
+    @Inject(DATABASE_CONNECTION) private readonly db: NodePgDatabase<typeof databaseSchema>,
     private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService,
     private readonly mem0MemoryService: Mem0MemoryService,
     private readonly cloudflareAIGatewayService: CloudflareAIGatewayService,

@@ -1,5 +1,7 @@
 import useSWR from 'swr';
 
+import { fetchJson } from '@/lib/http';
+
 export interface ChatModel {
   id: string;
   name: string;
@@ -10,18 +12,6 @@ export interface ModelsResponse {
   defaultModel: string;
 }
 
-const fetchSupportedModels = async (): Promise<ModelsResponse> => {
-  const response = await fetch('/api/chat/models', {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch supported models');
-  }
-
-  return await response.json();
-};
-
 export const useSupportedModels = () => {
-  return useSWR<ModelsResponse>('/api/chat/models', fetchSupportedModels);
+  return useSWR<ModelsResponse>('/api/chat/models', () => fetchJson<ModelsResponse>('/api/chat/models'));
 };

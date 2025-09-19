@@ -13,13 +13,21 @@ import {
   CommandSeparator,
 } from "@workspace/ui/components/command";
 import { PlusIcon, MessageSquareIcon } from "lucide-react";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { createChat, useChats } from "@/hooks/use-chat";
 
 export default function CommandK() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const { data: chatsData } = useChats(5, undefined, undefined, { refreshInterval: 0 });
+  const { data: chatsData, isLoading: isLoadingChats } = useChats(
+    5,
+    undefined,
+    undefined,
+    { refreshInterval: 0 },
+    { enabled: open },
+  );
   const chats = chatsData?.chats ?? [];
+  const showChatSkeleton = open && isLoadingChats && !chatsData;
   const [query, setQuery] = useState("");
   const [msgResults, setMsgResults] = useState<Array<{ chatId: string; title: string | null; snippet: string | null }>>([]);
   const [loading, setLoading] = useState(false);
@@ -101,19 +109,27 @@ export default function CommandK() {
           </CommandGroup>
         )}
         <CommandGroup heading="Chats">
-          {chats.map((c) => (
-            <CommandItem
-              key={c.id}
-              value={`${c.title ?? "Untitled"} ${c.id}`}
-              onSelect={() => {
-                setOpen(false);
-                router.push(`/chat/${c.id}`);
-              }}
-            >
-              <MessageSquareIcon className="mr-2 h-4 w-4" />
-              <span className="truncate">{c.title || "Untitled Conversation"}</span>
-            </CommandItem>
-          ))}
+          {showChatSkeleton ? (
+            Array.from({ length: 4 }).map((_, index) => (
+              <div key={`chat-skeleton-${index}`} className="px-2 py-2">
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ))
+          ) : (
+            chats.map((c) => (
+              <CommandItem
+                key={c.id}
+                value={`${c.title ?? "Untitled"} ${c.id}`}
+                onSelect={() => {
+                  setOpen(false);
+                  router.push(`/chat/${c.id}`);
+                }}
+              >
+                <MessageSquareIcon className="mr-2 h-4 w-4" />
+                <span className="truncate">{c.title || "Untitled Conversation"}</span>
+              </CommandItem>
+            ))
+          )}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

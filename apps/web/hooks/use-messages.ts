@@ -1,6 +1,8 @@
 import useSWR, { SWRConfiguration } from 'swr';
 import { UIMessage } from 'ai';
 
+import { fetchJson } from '@/lib/http';
+
 export interface MessagesResponse {
   messages: UIMessage[];
   hasMore: boolean;
@@ -13,18 +15,6 @@ export interface GetMessagesQuery {
   startingAfter?: string;
   endingBefore?: string;
 }
-
-const fetcher = async (url: string) => {
-  const response = await fetch(url, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch: ${url}`);
-  }
-
-  return await response.json();
-};
 
 export const useMessages = (
   chatId: string | undefined,
@@ -46,7 +36,7 @@ export const useMessages = (
 
   const url = chatId ? `/api/chat/${chatId}/messages?${params.toString()}` : null;
 
-  return useSWR<MessagesResponse>(url, fetcher);
+  return useSWR<MessagesResponse>(url, (requestUrl: string) => fetchJson<MessagesResponse>(requestUrl));
 };
 
 export const useAllMessages = (

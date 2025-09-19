@@ -17,6 +17,7 @@ import { Button } from '@workspace/ui/components/button';
 import { deleteChat as deleteChatApi, updateChatVisibility, archiveChat } from '@/hooks/use-chat';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover';
+import { Skeleton } from '@workspace/ui/components/skeleton';
 
 interface ConversationHistoryProps {
   trigger?: React.ReactNode;
@@ -30,11 +31,17 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
   const router = useRouter();
   const pathname = usePathname();
 
-  const { data: chatsData, isLoading, error, mutate } = useChats(50, undefined, undefined, {
-    refreshInterval: 0,
-  });
+  const {
+    data: chatsData,
+    isLoading,
+    error,
+    mutate,
+  } = useChats(50, undefined, undefined, { refreshInterval: 0 }, { enabled: isOpen });
 
   const conversations = chatsData?.chats || [];
+  const showLoading = isOpen && isLoading;
+  const fetchError = isOpen ? error : undefined;
+  const showEmpty = isOpen && !isLoading && !fetchError && conversations.length === 0;
 
   const handleChatSelect = (chatId: string) => {
     if (onChatSelect) {
@@ -145,20 +152,28 @@ export default function ConversationHistory({ trigger, onChatSelect }: Conversat
         </SheetHeader>
         
         <div className="mt-6 space-y-4">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
+          {showLoading ? (
+            <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={`conversation-skeleton-${index}`} className="p-4 rounded-lg border">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-6 w-6" />
+                  </div>
+                </div>
               ))}
             </div>
-          ) : error ? (
+          ) : fetchError ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">{error}</p>
+              <p className="text-muted-foreground mb-4">{fetchError instanceof Error ? fetchError.message : 'Failed to load conversations'}</p>
               <Button onClick={() => mutate()} variant="outline" size="sm">
                 Retry
               </Button>
             </div>
-          ) : conversations.length === 0 ? (
+          ) : showEmpty ? (
             <div className="text-center py-8">
               <HistoryIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground">No conversations yet</p>

@@ -6,15 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@workspace/ui/components/sheet';
-
-interface MessageDocument {
-  id: string;
-  fileName?: string;
-  fileSize?: number;
-  mimeType: string;
-  text?: string;
-  downloadUrl: string;
-}
+import type { MessageDocument } from '@/types/chat';
 
 interface DocumentPreviewProps {
   document: MessageDocument | null;
@@ -25,8 +17,10 @@ interface DocumentPreviewProps {
 export default function DocumentPreview({ document, isOpen, onClose }: DocumentPreviewProps) {
   if (!document) return null;
 
-  const isPdf = document.mimeType === 'application/pdf';
-  const isDocx = document.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const mimeType = document.mimeType ?? '';
+  const isPdf = mimeType === 'application/pdf';
+  const isDocx = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const isPlainText = mimeType.startsWith('text/');
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -62,6 +56,18 @@ export default function DocumentPreview({ document, isOpen, onClose }: DocumentP
                 className="w-full h-full border-0 rounded-lg"
                 title={document.fileName || 'DOCX Preview'}
               />
+            </div>
+          )}
+
+          {isPlainText && document.text && (
+            <pre className="whitespace-pre-wrap text-sm text-muted-foreground">
+              {document.text}
+            </pre>
+          )}
+
+          {!isPdf && !isDocx && !isPlainText && (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Preview is not available for this file type.
             </div>
           )}
         </div>

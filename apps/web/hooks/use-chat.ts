@@ -1,5 +1,7 @@
 import useSWR, { SWRConfiguration } from 'swr';
 
+import { fetchJson } from '@/lib/http';
+
 export interface CreateChatRequest {
   id: string;
 }
@@ -20,23 +22,16 @@ export interface ChatResponse {
   nextCursor?: string;
 }
 
-const fetcher = async (url: string) => {
-  const response = await fetch(url, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch: ${url}`);
-  }
-
-  return await response.json();
-};
+interface UseChatsOptions {
+  enabled?: boolean;
+}
 
 export const useChats = (
   limit: number = 50,
   startingAfter?: string,
   endingBefore?: string,
-  config?: SWRConfiguration
+  config?: SWRConfiguration,
+  options?: UseChatsOptions,
 ) => {
   const params = new URLSearchParams({
     limit: limit.toString(),
@@ -51,90 +46,64 @@ export const useChats = (
   }
 
   const url = `/api/chat?${params.toString()}`;
+  const shouldFetch = options?.enabled ?? true;
+  const key = shouldFetch ? url : null;
 
-  return useSWR<ChatResponse>(url, fetcher, { ...config });
+  return useSWR<ChatResponse>(key, (requestUrl: string) => fetchJson<ChatResponse>(requestUrl), {
+    ...config,
+  });
 };
 
 export const useChat = (chatId: string | undefined, config?: SWRConfiguration) => {
   return useSWR<Chat>(
     chatId ? `/api/chat/${chatId}` : null,
-    fetcher,
-    { ...config }
+    (requestUrl: string) => fetchJson<Chat>(requestUrl),
+    { ...config },
   );
 };
 
 export const createChat = async (data: CreateChatRequest): Promise<Chat> => {
-  const response = await fetch('/api/chat/create', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  return fetchJson<Chat>('/api/chat/create', {
+    init: {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     },
-    credentials: 'include',
-    body: JSON.stringify(data),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to create chat');
-  }
-
-  return await response.json();
 };
 
 export const deleteChat = async (chatId: string): Promise<{ id: string; deleted: boolean } | void> => {
-  let res = await fetch(`/api/chat/${chatId}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
-
-  if (!res.ok) {
-    res = await fetch(`/api/chat/${chatId}`, {
+  return fetchJson<{ id: string; deleted: boolean } | void>(`/api/chat/${chatId}`, {
+    init: {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-  }
-
-  if (!res.ok) {
-    throw new Error('Failed to delete chat');
-  }
-
-  try {
-    return await res.json();
-  } catch {
-    return;
-  }
+    },
+    allowEmpty: true,
+  });
 };
 
 export const updateChatVisibility = async (chatId: string, isPublic: boolean) => {
-  const response = await fetch(`/api/chat/${chatId}/visibility`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
+  return fetchJson(`/api/chat/${chatId}/visibility`, {
+    init: {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ isPublic }),
     },
-    credentials: 'include',
-    body: JSON.stringify({ isPublic }),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to update chat visibility');
-  }
-
-  return await response.json();
 };
 
 export const archiveChat = async (chatId: string, isArchived: boolean = true) => {
-  const response = await fetch(`/api/chat/${chatId}/archive`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
+  return fetchJson(`/api/chat/${chatId}/archive`, {
+    init: {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ isArchived }),
     },
-    credentials: 'include',
-    body: JSON.stringify({ isArchived }),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to update chat archive status');
-  }
-
-  return await response.json();
 };

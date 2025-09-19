@@ -1,40 +1,59 @@
 'use client';
 
-import { FileIcon, DownloadIcon, EyeIcon } from 'lucide-react';
+import { EyeIcon, FileIcon } from 'lucide-react';
 import { UIMessage } from 'ai';
-import mime from 'mime-types';
 
 import { Button } from '@workspace/ui/components/button';
 import { Card, CardContent } from '@workspace/ui/components/card';
-
-interface MessageDocument {
-  id: string;
-  fileName?: string;
-  fileSize?: number;
-  mimeType: string;
-  downloadUrl: string;
-}
+import { formatFileSize } from '@/lib/utils';
+import type { MessageDocument } from '@/types/chat';
 
 interface DocumentAttachmentsProps {
   message: UIMessage;
   onPreview: (document: MessageDocument) => void;
 }
 
-export default function DocumentAttachments({ message, onPreview }: DocumentAttachmentsProps) {
-  const fileParts = message.parts.filter(part => part.type === 'file');
-  
-  if (fileParts.length === 0) return null;
+type MessagePart = UIMessage['parts'][number];
 
-  const documents: MessageDocument[] = fileParts.map((part, index) => {
-    const filePart = part as any;
-    return {
+type FilePart = Extract<MessagePart, { type: 'file' }> & {
+  url: string;
+  filename?: string;
+  fileSize?: number;
+  mediaType?: string;
+  providerMetadata?: { file?: { id?: string } };
+};
+
+const isFilePart = (part: MessagePart): part is FilePart => part.type === 'file' && 'url' in part;
+
+const buildDocumentList = (message: UIMessage): MessageDocument[] => {
+  return message.parts
+    .filter(isFilePart)
+    .map((filePart, index) => ({
       id: filePart.providerMetadata?.file?.id || `${message.id}-file-${index}`,
       fileName: filePart.filename,
       fileSize: filePart.fileSize,
       mimeType: filePart.mediaType,
       downloadUrl: filePart.url,
-    };
-  });
+    }));
+};
+
+const getDocumentMeta = (document: MessageDocument): string => {
+  if (document.fileSize && document.fileSize > 0) {
+    return formatFileSize(document.fileSize);
+  }
+
+  if (document.mimeType) {
+    const [, subtype] = document.mimeType.split('/');
+    return subtype ? subtype.toUpperCase() : document.mimeType;
+  }
+
+  return 'Unknown file type';
+};
+
+export default function DocumentAttachments({ message, onPreview }: DocumentAttachmentsProps) {
+  const documents = buildDocumentList(message);
+
+  if (documents.length === 0) return null;
 
   return (
     <div className="mt-3 space-y-2">
@@ -45,10 +64,10 @@ export default function DocumentAttachments({ message, onPreview }: DocumentAtta
               <FileIcon className="h-4 w-4 text-muted-foreground" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
-                  {doc.fileName}
+                  {doc.fileName || 'Attachment'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(1)} MB` : mime.extension(doc.mimeType)}
+                  {getDocumentMeta(doc)}
                 </p>
               </div>
               <div className="flex items-center gap-1">
