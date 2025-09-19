@@ -5,6 +5,7 @@ import { fetchJson } from '@/lib/http';
 export interface ChatModel {
   id: string;
   name: string;
+  supportsReasoning: boolean;
 }
 
 export interface ModelsResponse {

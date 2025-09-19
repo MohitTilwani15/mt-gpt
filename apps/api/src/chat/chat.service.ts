@@ -24,6 +24,7 @@ import {
   GetMessagesQueryDto,
   VoteMessageDto,
   ChatModel,
+  CHAT_MODEL_SUPPORTS_REASONING,
 } from './dto/chat.dto';
 import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
@@ -46,7 +47,7 @@ export class ChatService {
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
-    const { id, message, selectedChatModel } = requestBody;
+    const { id, message, selectedChatModel, enableReasoning } = requestBody;
 
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
@@ -107,6 +108,7 @@ export class ChatService {
         abortSignal,
         userId: session.user.id,
         additionalSystemContext: memoryContext,
+        enableReasoning: Boolean(enableReasoning),
       });
     });
   }
@@ -207,6 +209,7 @@ export class ChatService {
     abortSignal,
     userId,
     additionalSystemContext,
+    enableReasoning,
   }: {
     chatId: string;
     messages: UIMessage[];
@@ -215,8 +218,12 @@ export class ChatService {
     abortSignal?: AbortSignal;
     userId: string;
     additionalSystemContext?: string;
+    enableReasoning?: boolean;
   }) {
     let finalUsage: LanguageModelUsage | undefined;
+
+    const reasoningAllowed = Boolean(enableReasoning) &&
+      CHAT_MODEL_SUPPORTS_REASONING[selectedChatModel];
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -279,15 +286,18 @@ export class ChatService {
           tools: {
             webSearch: this.linkupsoWebSearchToolService.askLinkupTool()
           },
-          providerOptions: {
-            openai: {
-              reasoningEffort: 'high',
-              reasoningSummary: 'detailed'
-            },
-            xai: {
-              reasoningEffort: 'high',
-            }
-          },
+          ...(reasoningAllowed ? { reasoning: { effort: 'medium' as const } } : {}),
+          providerOptions: reasoningAllowed
+            ? {
+                openai: {
+                  reasoningEffort: 'high',
+                  reasoningSummary: 'detailed',
+                },
+                xai: {
+                  reasoningEffort: 'high',
+                },
+              }
+            : undefined,
           onFinish: ({ usage }) => {
             finalUsage = usage
           },
@@ -296,7 +306,7 @@ export class ChatService {
 
         result.consumeStream();
 
-        dataStream.merge(result.toUIMessageStream({ sendReasoning: true, sendSources: true }));
+        dataStream.merge(result.toUIMessageStream({ sendReasoning: reasoningAllowed, sendSources: true }));
       },
       generateId: uuidv4,
       onFinish: async ({ responseMessage, isAborted }) => {

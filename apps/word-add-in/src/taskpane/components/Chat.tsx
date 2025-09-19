@@ -29,6 +29,7 @@ import { getApiUrl } from "../utils/api";
 interface ChatModel {
   id: string;
   name: string;
+  supportsReasoning?: boolean;
 }
 
 const LOCAL_STORAGE_KEY = "word-addin-selected-chat-model";

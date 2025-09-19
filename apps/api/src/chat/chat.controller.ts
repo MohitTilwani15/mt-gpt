@@ -26,6 +26,7 @@ import {
   GetVotesQueryDto,
   ChatModel,
   CHAT_MODEL_NAMES,
+  CHAT_MODEL_SUPPORTS_REASONING,
 } from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
 
@@ -131,6 +132,7 @@ export class ChatController {
       const models = Object.values(ChatModel).map((modelId) => ({
         id: modelId,
         name: CHAT_MODEL_NAMES[modelId],
+        supportsReasoning: CHAT_MODEL_SUPPORTS_REASONING[modelId],
       }));
 
       return res.json({

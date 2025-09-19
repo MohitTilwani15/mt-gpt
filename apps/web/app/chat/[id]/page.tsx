@@ -6,6 +6,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import { useChat } from "@ai-sdk/react";
 import { UIMessage } from "ai";
@@ -21,6 +22,7 @@ import { Button } from "@workspace/ui/components/button";
 import { useSharedChatContext } from "@/providers/chat-context";
 import { useChat as useChatDetails } from "@/hooks/use-chat";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { Switch } from "@workspace/ui/components/switch";
 
 interface UploadedFile {
   id: string;
@@ -43,12 +45,13 @@ export default function ChatPage() {
   const chatHeaderTitle = isChatLoading ? (
     <Skeleton className="h-6 w-32" />
   ) : (
-    chatTitle || "New Chat"
+    chatTitle || "Untitled Conversation"
   );
   
   const [text, setText] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
   const { isUploading: isFileUploading, uploadFiles, clearError: clearFileUploadError } = useFileUpload();
   
   const {
@@ -62,6 +65,19 @@ export default function ChatPage() {
   useEffect(() => {
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
+
+  const currentModel = useMemo(
+    () => supportedModels.find((model) => model.id === selectedModel),
+    [supportedModels, selectedModel],
+  );
+  const reasoningSupported = Boolean(currentModel?.supportsReasoning);
+  const effectiveReasoningEnabled = reasoningSupported ? isReasoningEnabled : false;
+
+  useEffect(() => {
+    if (!reasoningSupported && isReasoningEnabled) {
+      setIsReasoningEnabled(false);
+    }
+  }, [reasoningSupported, isReasoningEnabled]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -77,8 +93,8 @@ export default function ChatPage() {
 
   
   useEffect(() => {
-    setChatContext({ chatId, selectedModel });
-  }, [chatId, selectedModel]);
+    setChatContext({ chatId, selectedModel, reasoningEnabled: effectiveReasoningEnabled });
+  }, [chatId, selectedModel, effectiveReasoningEnabled]);
 
   useEffect(() => {
     const loadChat = async () => {
@@ -208,7 +224,21 @@ export default function ChatPage() {
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
-        <ChatHeader title={chatHeaderTitle} showBackButton={true} onBack={handleBack} />
+        <ChatHeader title={chatHeaderTitle} showBackButton={true} onBack={handleBack}>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Reasoning</span>
+            <Switch
+              checked={effectiveReasoningEnabled}
+              onCheckedChange={(checked) => {
+                if (!reasoningSupported) {
+                  return;
+                }
+                setIsReasoningEnabled(checked);
+              }}
+              disabled={!reasoningSupported}
+            />
+          </div>
+        </ChatHeader>
         
         <MessageList
           chatId={chatId}

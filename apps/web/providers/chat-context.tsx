@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 interface ChatContextValue {
   chat: Chat<UIMessage>;
   clearChat: () => void;
-  setChatContext: (ctx: { chatId?: string; selectedModel?: string }) => void;
+  setChatContext: (ctx: { chatId?: string; selectedModel?: string; reasoningEnabled?: boolean }) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -16,6 +16,7 @@ const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const chatIdRef = useRef<string | undefined>(undefined);
   const selectedModelRef = useRef<string | undefined>(undefined);
+  const reasoningEnabledRef = useRef<boolean>(false);
 
   const createChat = () => new Chat<UIMessage>({
     generateId: () => uuidv4(),
@@ -28,6 +29,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             id: chatIdRef.current,
             selectedChatModel: selectedModelRef.current,
             message: lastMessage,
+            enableReasoning: reasoningEnabledRef.current,
           },
         };
       },
@@ -40,9 +42,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setChat(createChat());
   };
 
-  const setChatContext = (ctx: { chatId?: string; selectedModel?: string }) => {
+  const setChatContext = (ctx: { chatId?: string; selectedModel?: string; reasoningEnabled?: boolean }) => {
     if (ctx.chatId !== undefined) chatIdRef.current = ctx.chatId;
     if (ctx.selectedModel !== undefined) selectedModelRef.current = ctx.selectedModel;
+    if (ctx.reasoningEnabled !== undefined) reasoningEnabledRef.current = ctx.reasoningEnabled;
   };
 
   return (
