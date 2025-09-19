@@ -147,7 +147,7 @@ export class ChatService {
       throw new ChatSDKError('not_found:chat');
     }
 
-    if (chat.userId !== session.user.id) {
+    if (chat.userId !== session.user.id && !chat.isPublic) {
       throw new ChatSDKError('forbidden:chat');
     }
 
@@ -409,7 +409,7 @@ export class ChatService {
       throw new ChatSDKError('not_found:chat');
     }
 
-    if (chat.userId !== session.user.id) {
+    if (chat.userId !== session.user.id && !chat.isPublic) {
       throw new ChatSDKError('forbidden:chat');
     }
 
