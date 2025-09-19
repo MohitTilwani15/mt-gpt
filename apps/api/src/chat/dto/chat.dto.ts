@@ -103,6 +103,11 @@ export class VoteMessageDto {
   type: 'up' | 'down';
 }
 
+export class ForkChatRequestDto {
+  @IsUUID()
+  messageId: string;
+}
+
 export class GetMessagesQueryDto {
   @IsOptional()
   @IsString()

@@ -154,6 +154,62 @@ export class ChatService {
     return chat;
   }
 
+  async forkChat(chatId: string, messageId: string, session: UserSession) {
+    const existingChat = await this.chatQueryService.getChatById({ id: chatId });
+
+    if (!existingChat) {
+      throw new ChatSDKError('not_found:chat');
+    }
+
+    if (existingChat.userId !== session.user.id) {
+      throw new ChatSDKError('forbidden:chat');
+    }
+
+    const messages = await this.messageQueryService.getMessagesUpToMessage({
+      chatId,
+      messageId,
+    });
+
+    if (messages.length === 0 || messages[messages.length - 1]?.id !== messageId) {
+      throw new ChatSDKError('bad_request:chat', 'Unable to fork chat at the requested message');
+    }
+
+    const targetMessage = messages[messages.length - 1];
+
+    if (targetMessage.role !== 'assistant') {
+      throw new ChatSDKError('bad_request:chat', 'Only assistant messages can be used to fork chats');
+    }
+
+    const newChatId = uuidv4();
+    const sourceTitle = existingChat.title?.trim();
+    const forkTitle = sourceTitle && sourceTitle !== 'New Chat'
+      ? `${sourceTitle} (Fork)`
+      : 'Forked Chat';
+
+    const forkedChat = await this.chatQueryService.createChat({
+      id: newChatId,
+      userId: session.user.id,
+      title: forkTitle,
+    });
+
+    for (const msg of messages) {
+      const clonedId = uuidv4();
+      const clonedMessage: UIMessage = {
+        ...msg,
+        id: clonedId,
+        parts: msg.parts.map((part) => ({ ...part })),
+      };
+
+      await this.messageQueryService.upsertMessage({
+        messageId: clonedId,
+        chatId: newChatId,
+        message: clonedMessage,
+      });
+    }
+
+    return forkedChat;
+  }
+
   async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }) {
     return this.messageQueryService.searchChatsByMessageTerm(params);
   }

@@ -50,6 +50,54 @@ export class MessageQueryService {
     });
   };
 
+  async getMessagesUpToMessage({
+    chatId,
+    messageId,
+  }: {
+    chatId: string;
+    messageId: string;
+  }): Promise<UIMessage[]> {
+    try {
+      const messages = await this.db.query.message.findMany({
+        where: eq(message.chatId, chatId),
+        with: {
+          parts: {
+            orderBy: (parts, { asc }) => [asc(parts.order)],
+          },
+        },
+        orderBy: (msg, { asc }) => [asc(msg.createdAt), asc(msg.id)],
+      });
+
+      const result: UIMessage[] = [];
+      let found = false;
+
+      for (const msg of messages) {
+        result.push({
+          id: msg.id,
+          role: msg.role,
+          parts: msg.parts.map(mapDBPartToUIMessagePart),
+        });
+
+        if (msg.id === messageId) {
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        throw new ChatSDKError('not_found:chat', 'Message not found in chat');
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        throw error;
+      }
+
+      throw new ChatSDKError('bad_request:database', 'Failed to load messages for fork');
+    }
+  }
+
   async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }) {
     const { userId, term, limit = 10 } = params;
 

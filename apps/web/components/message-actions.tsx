@@ -4,9 +4,10 @@ import { useCopyToClipboard } from 'usehooks-ts';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { UIMessage, ChatStatus } from 'ai';
-import { CopyIcon, ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon } from 'lucide-react';
+import { CopyIcon, ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon, GitForkIcon } from 'lucide-react';
 import { Button } from '@workspace/ui/components/button';
 import { updateVote } from '@/hooks/use-votes';
+import { useRouter } from 'next/navigation';
 
 interface MessageActionsProps {
   chatId: string;
@@ -27,9 +28,11 @@ export function MessageActions({
   onRegenerate,
   className = '',
 }: MessageActionsProps) {
+  const router = useRouter();
   const [_, copyToClipboard] = useCopyToClipboard();
   const [isVoting, setIsVoting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isForking, setIsForking] = useState(false);
 
   // Don't show actions while loading
   if (isLoading) {
@@ -92,11 +95,48 @@ export function MessageActions({
     }
   };
 
-  // Only show regenerate if the message is the last assistant message and not currently streaming
+  const handleFork = async () => {
+    if (isForking || message.role !== 'assistant') {
+      return;
+    }
+
+    setIsForking(true);
+
+    try {
+      const response = await fetch(`/api/chat/${chatId}/fork`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ messageId: message.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fork chat');
+      }
+
+      const data = await response.json();
+      const newChatId = data?.id;
+
+      if (!newChatId) {
+        throw new Error('Fork chat did not return an id');
+      }
+
+      toast.success('Forked chat created');
+      router.push(`/chat/${newChatId}`);
+    } catch (error) {
+      console.error('Fork chat failed', error);
+      toast.error('Failed to fork chat');
+    } finally {
+      setIsForking(false);
+    }
+  };
+
   const showRegenerate = onRegenerate && status !== 'streaming' && message.role === 'assistant';
 
-  // Only show vote buttons for assistant messages
   const showVoteButtons = message.role === 'assistant';
+  const showForkButton = message.role === 'assistant';
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
@@ -105,7 +145,7 @@ export function MessageActions({
         size="icon"
         className="h-8 w-8"
         onClick={handleCopy}
-        title={message.role === 'user' ? "Copy your message" : "Copy response"}
+        title={message.role === 'user' ? "Copy your message" : "Copy"}
       >
         <CopyIcon className="h-4 w-4" />
       </Button>
@@ -117,9 +157,22 @@ export function MessageActions({
           className="h-8 w-8"
           onClick={handleRegenerate}
           disabled={isRegenerating}
-          title="Regenerate response"
+          title="Regenerate"
         >
           <RefreshCwIcon className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+        </Button>
+      )}
+
+      {showForkButton && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={handleFork}
+          disabled={isForking}
+          title="Fork"
+        >
+          <GitForkIcon className={`h-4 w-4 ${isForking ? 'animate-pulse' : ''}`} />
         </Button>
       )}
 
@@ -131,7 +184,7 @@ export function MessageActions({
             className="h-8 w-8"
             onClick={() => handleVote('up')}
             disabled={isVoting || vote?.isUpvoted}
-            title={vote?.isUpvoted ? 'Already upvoted' : 'Upvote response'}
+            title={vote?.isUpvoted ? 'Already upvoted' : 'Upvote'}
           >
             <ThumbsUpIcon className={`h-4 w-4 ${vote?.isUpvoted ? 'fill-current text-green-500' : ''}`} />
           </Button>
@@ -142,7 +195,7 @@ export function MessageActions({
             className="h-8 w-8"
             onClick={() => handleVote('down')}
             disabled={isVoting || !!(vote && !vote.isUpvoted)}
-            title={vote && !vote.isUpvoted ? 'Already downvoted' : 'Downvote response'}
+            title={vote && !vote.isUpvoted ? 'Already downvoted' : 'Downvote'}
           >
             <ThumbsDownIcon className={`h-4 w-4 ${vote && !vote.isUpvoted ? 'fill-current text-red-500' : ''}`} />
           </Button>

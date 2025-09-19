@@ -27,6 +27,7 @@ import {
   ChatModel,
   CHAT_MODEL_NAMES,
   CHAT_MODEL_SUPPORTS_REASONING,
+  ForkChatRequestDto,
 } from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
 
@@ -364,6 +365,29 @@ export class ChatController {
         return res.status(this.getHttpStatus(error.type)).json({ error: error.type, message: error.message });
       }
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'offline:chat', message: 'Internal server error' });
+    }
+  }
+
+  @Post(':id/fork')
+  async forkChat(
+    @Param('id') id: string,
+    @Body() body: ForkChatRequestDto,
+    @Session() session: UserSession,
+    @Res() res: Response,
+  ) {
+    try {
+      if (!body?.messageId) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'bad_request:api', message: 'messageId is required' });
+      }
+
+      const result = await this.chatService.forkChat(id, body.messageId, session);
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof ChatSDKError) {
+        return res.status(this.getHttpStatus(error.type)).json({ error: error.type, message: error.message });
+      }
+
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'offline:chat', message: 'Failed to fork chat' });
     }
   }
 
