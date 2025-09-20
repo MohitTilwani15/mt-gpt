@@ -8,6 +8,7 @@ import { CopyIcon, ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon, GitForkIcon } fr
 import { Button } from '@workspace/ui/components/button';
 import { updateVote } from '@/hooks/use-votes';
 import { useRouter } from 'next/navigation';
+import { resolveApiUrl } from '@/lib/http';
 
 interface MessageActionsProps {
   chatId: string;
@@ -103,7 +104,7 @@ export function MessageActions({
     setIsForking(true);
 
     try {
-      const response = await fetch(`/api/chat/${chatId}/fork`, {
+      const response = await fetch(resolveApiUrl(`/api/chat/${chatId}/fork`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

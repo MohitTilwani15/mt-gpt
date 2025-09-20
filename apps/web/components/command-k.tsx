@@ -15,6 +15,7 @@ import {
 import { PlusIcon, MessageSquareIcon } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { createChat, useChats } from "@/hooks/use-chat";
+import { resolveApiUrl } from "@/lib/http";
 
 export default function CommandK() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function CommandK() {
     const t = setTimeout(async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/chat/search?q=${encodeURIComponent(q)}&limit=8`, { credentials: 'include' });
+        const res = await fetch(resolveApiUrl(`/api/chat/search?q=${encodeURIComponent(q)}&limit=8`), { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           setMsgResults((data.results || []).map((r: any) => ({ chatId: r.chatId, title: r.title, snippet: r.snippet })));

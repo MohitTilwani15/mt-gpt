@@ -5,6 +5,8 @@ import { Chat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
 import { v4 as uuidv4 } from "uuid";
 
+import { resolveApiUrl } from '@/lib/http';
+
 interface ChatContextValue {
   chat: Chat<UIMessage>;
   clearChat: () => void;
@@ -21,7 +23,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const createChat = () => new Chat<UIMessage>({
     generateId: () => uuidv4(),
     transport: new DefaultChatTransport({
-      api: '/api/chat',
+      api: resolveApiUrl('/api/chat'),
+      credentials: 'include',
       prepareSendMessagesRequest: ({ messages }) => {
         const lastMessage = messages[messages.length - 1];
         return {

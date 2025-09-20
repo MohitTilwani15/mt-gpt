@@ -2,6 +2,8 @@
 
 import { SWRConfig } from 'swr';
 
+import { resolveApiUrl } from '@/lib/http';
+
 export default function SWRProvider({ 
   children 
 }: { 
@@ -16,7 +18,7 @@ export default function SWRProvider({
         dedupingInterval: 60000,
         errorRetryCount: 0,
         refreshInterval: 0,
-        fetcher: (url: string) => fetch(url, {
+        fetcher: (url: string) => fetch(resolveApiUrl(url), {
           credentials: 'include',
         }).then(res => {
           if (!res.ok) {

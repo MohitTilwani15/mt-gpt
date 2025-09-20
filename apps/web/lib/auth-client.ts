@@ -1,5 +1,7 @@
 import { createAuthClient } from 'better-auth/react';
 
+import { resolveApiUrl } from '@/lib/http';
+
 export const authClient = createAuthClient({
-  basePath: '/api/auth',
+  baseURL: resolveApiUrl('/api/auth'),
 });

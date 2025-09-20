@@ -23,6 +23,7 @@ import { useSharedChatContext } from "@/providers/chat-context";
 import { useChat as useChatDetails } from "@/hooks/use-chat";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Switch } from "@workspace/ui/components/switch";
+import { resolveApiUrl } from "@/lib/http";
 
 interface UploadedFile {
   id: string;
@@ -110,7 +111,7 @@ export default function ChatPage() {
           sessionStorage.removeItem(`chat-${chatId}`);
           await sendMessage(initialMessage)
         } else {
-          const messagesResponse = await fetch(`/api/chat/${chatId}/messages?limit=100`, {
+          const messagesResponse = await fetch(resolveApiUrl(`/api/chat/${chatId}/messages?limit=100`), {
             credentials: "include",
           });
 
@@ -269,7 +270,7 @@ export default function ChatPage() {
               height: 400,
               streamCapture: {
                 enabled: true,
-                endpoint: "/api/chat",
+                endpoint: resolveApiUrl('/api/chat'),
                 autoConnect: true
               },
               throttle: {

@@ -1,3 +1,25 @@
+const ABSOLUTE_URL_REGEX = /^https?:\/\//i;
+const DEFAULT_API_BASE_URL = 'https://gpt.alphalink.xyz';
+
+const envApiBase = process.env.NEXT_PUBLIC_API_URL;
+const sanitizedBase = envApiBase && envApiBase.trim().length > 0
+  ? envApiBase.replace(/\/+$/, '')
+  : DEFAULT_API_BASE_URL;
+
+export const API_BASE_URL = sanitizedBase;
+
+export const resolveApiUrl = (path: string): string => {
+  if (ABSOLUTE_URL_REGEX.test(path)) {
+    return path;
+  }
+
+  if (path.startsWith('/')) {
+    return `${API_BASE_URL}${path}`;
+  }
+
+  return `${API_BASE_URL}/${path}`;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly statusText: string;
@@ -28,7 +50,9 @@ export async function fetchJson<T>(
     allowEmpty = false,
   }: FetchJsonOptions<T> = {},
 ): Promise<T> {
-  const response = await fetch(input, {
+  const resolvedInput = typeof input === 'string' ? resolveApiUrl(input) : input;
+
+  const response = await fetch(resolvedInput, {
     credentials,
     ...init,
   });

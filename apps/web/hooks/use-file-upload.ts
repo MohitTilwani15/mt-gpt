@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 
+import { resolveApiUrl } from '@/lib/http';
+
 export interface UploadedFile {
   id: string;
   fileName: string;
@@ -39,7 +41,7 @@ export const useFileUpload = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/files/upload', {
+      const response = await fetch(resolveApiUrl('/api/files/upload'), {
         method: 'POST',
         body: formData,
         credentials: 'include',
