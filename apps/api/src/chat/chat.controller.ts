@@ -12,7 +12,7 @@ import {
   Delete,
   Req,
 } from '@nestjs/common';
-import { AuthGuard, Session, UserSession, Public } from '@mguay/nestjs-better-auth';
+import { AuthGuard, Session, UserSession } from '@mguay/nestjs-better-auth';
 import { Response, Request } from 'express';
 import { Readable } from 'stream';
 import { JsonToSseTransformStream } from 'ai';
@@ -134,7 +134,6 @@ export class ChatController {
   }
 
   @Get('models')
-  @Public()
   async getSupportedModels(@Res() res: Response) {
     try {
       const models = Object.values(ChatModel).map((modelId) => ({
