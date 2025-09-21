@@ -33,6 +33,7 @@ import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
 import { LinkUpSoWebSearchToolService } from '../lib/tools/linkup-so-web-search.tool'
 import { Mem0MemoryService } from './services/mem0-memory.service';
 import { CloudflareAIGatewayService } from 'src/services/cloudflare-ai-gateway.service';
+import { McpToolService } from './services/mcp-tool.service';
 import { AssistantQueryService } from 'src/database/queries/assistant.query';
 import { AssistantKnowledgeQueryService } from 'src/database/queries/assistant-knowledge.query';
 import type { AssistantCapabilities } from 'src/database/schemas/assistant.schema';
@@ -49,6 +50,7 @@ export class ChatService {
     private readonly cloudflareAIGatewayService: CloudflareAIGatewayService,
     private readonly assistantQueryService: AssistantQueryService,
     private readonly assistantKnowledgeQueryService: AssistantKnowledgeQueryService,
+    private readonly mcpToolService: McpToolService,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
@@ -420,11 +422,14 @@ export class ChatService {
           ? assistantContext.capabilities.webSearch !== false
           : true;
 
-        const tools = enableWebSearch
-          ? {
-              webSearch: this.linkupsoWebSearchToolService.askLinkupTool(),
-            }
-          : undefined;
+        const mcpTools = await this.mcpToolService.getTools();
+        const tools: Record<string, any> = { ...mcpTools };
+
+        if (enableWebSearch && !tools.webSearch) {
+          tools.webSearch = this.linkupsoWebSearchToolService.askLinkupTool();
+        }
+
+        const hasTools = Object.keys(tools).length > 0;
 
         const result = streamText({
           model: this.cloudflareAIGatewayService.aigateway([openai(selectedChatModel || 'gpt-4o')]),
@@ -442,8 +447,8 @@ export class ChatService {
               assistantId: assistantContext?.assistantId,
             },
           },
-          ...(tools ? { tools } : {}),
-          ...(reasoningAllowed ? { reasoning: { effort: 'medium' as const } } : {}),
+          ...(hasTools ? { tools } : {}),
+          ...(reasoningAllowed ? { reasoning: { effort: 'medium' } } : {}),
           providerOptions: reasoningAllowed
             ? {
                 openai: {

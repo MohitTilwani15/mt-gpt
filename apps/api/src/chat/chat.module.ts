@@ -17,6 +17,7 @@ import { LinkUpSoWebSearchToolService } from 'src/lib/tools/linkup-so-web-search
 import { CloudflareAIGatewayService } from 'src/services/cloudflare-ai-gateway.service';
 import { MemoryService } from './services/memory.service';
 import { Mem0MemoryService } from './services/mem0-memory.service';
+import { McpToolService } from './services/mcp-tool.service';
 
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -35,6 +36,7 @@ import { Mem0MemoryService } from './services/mem0-memory.service';
     LinkUpSoWebSearchToolService,
     MemoryService,
     Mem0MemoryService,
+    McpToolService,
   ],
 })
 export class ChatModule {}
