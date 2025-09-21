@@ -19,10 +19,12 @@ export class ChatQueryService {
     id,
     userId,
     title,
+    assistantId,
   }: {
     id: string;
     userId: string;
     title?: string;
+    assistantId?: string | null;
   }) {
     try {
       const [chatRow] = await this.db
@@ -32,12 +34,14 @@ export class ChatQueryService {
           userId,
           title,
           createdAt: new Date(),
+          assistantId: assistantId ?? null,
         })
         .returning({
           id: chat.id,
           title: chat.title,
           userId: chat.userId,
           createdAt: chat.createdAt,
+          assistantId: chat.assistantId,
           isPublic: chat.isPublic,
           isArchived: chat.isArchived,
         });
@@ -184,6 +188,20 @@ export class ChatQueryService {
       return { id, title };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to update chat title');
+    }
+  }
+
+  async assignAssistantToChat({ chatId, assistantId }: { chatId: string; assistantId: string }) {
+    try {
+      const [updated] = await this.db
+        .update(chat)
+        .set({ assistantId })
+        .where(eq(chat.id, chatId))
+        .returning();
+
+      return updated;
+    } catch (error) {
+      throw new ChatSDKError('bad_request:database', 'Failed to assign assistant to chat');
     }
   }
 }

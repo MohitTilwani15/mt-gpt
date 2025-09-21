@@ -54,6 +54,7 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
   const { isUploading: isFileUploading, uploadFiles, clearError: clearFileUploadError } = useFileUpload();
+  const [activeAssistantId, setActiveAssistantId] = useState<string | undefined>(undefined);
   
   const {
     selectedModel,
@@ -94,8 +95,19 @@ export default function ChatPage() {
 
   
   useEffect(() => {
-    setChatContext({ chatId, selectedModel, reasoningEnabled: effectiveReasoningEnabled });
-  }, [chatId, selectedModel, effectiveReasoningEnabled]);
+    setChatContext({
+      chatId,
+      selectedModel,
+      reasoningEnabled: effectiveReasoningEnabled,
+      assistantId: activeAssistantId,
+    });
+  }, [chatId, selectedModel, effectiveReasoningEnabled, activeAssistantId]);
+
+  useEffect(() => {
+    if (chatDetails?.assistantId) {
+      setActiveAssistantId(chatDetails.assistantId);
+    }
+  }, [chatDetails?.assistantId]);
 
   useEffect(() => {
     const loadChat = async () => {
@@ -107,9 +119,23 @@ export default function ChatPage() {
         const initialMessageData = sessionStorage.getItem(`chat-${chatId}`);
         
         if (initialMessageData) {
-          const initialMessage: UIMessage = JSON.parse(initialMessageData);
-          sessionStorage.removeItem(`chat-${chatId}`);
-          await sendMessage(initialMessage)
+          try {
+            const parsed = JSON.parse(initialMessageData);
+            let initialMessage: UIMessage;
+
+            if (parsed && typeof parsed === 'object' && 'message' in parsed) {
+              initialMessage = parsed.message as UIMessage;
+              if (parsed.assistantId) {
+                setActiveAssistantId(parsed.assistantId as string);
+              }
+            } else {
+              initialMessage = parsed as UIMessage;
+            }
+
+            await sendMessage(initialMessage);
+          } finally {
+            sessionStorage.removeItem(`chat-${chatId}`);
+          }
         } else {
           const messagesResponse = await fetch(resolveApiUrl(`/api/chat/${chatId}/messages?limit=100`), {
             credentials: "include",
@@ -136,7 +162,7 @@ export default function ChatPage() {
     if (chatId) {
       loadChat();
     }
-  }, [isLoadingModels]);
+  }, [isLoadingModels, chatId, sendMessage, setMessages, router]);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {

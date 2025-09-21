@@ -60,12 +60,17 @@ export class PostChatRequestDto {
 
   message: UIMessage;
 
+  @IsOptional()
   @IsEnum(ChatModel)
-  selectedChatModel: ChatModel;
+  selectedChatModel?: ChatModel;
 
   @IsOptional()
   @IsBoolean()
   enableReasoning?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  assistantId?: string;
 }
 
 export class GetChatsQueryDto {

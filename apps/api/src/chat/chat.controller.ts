@@ -257,12 +257,12 @@ export class ChatController {
 
   @Post('create')
   async createNewChat(
-    @Body() body: { id: string },
+    @Body() body: { id: string; assistantId?: string },
     @Session() session: UserSession,
     @Res() res: Response,
   ) {
     try {
-      const chat = await this.chatService.createNewChat(body.id, session);
+      const chat = await this.chatService.createNewChat(body.id, session, body.assistantId);
       return res.json(chat);
     } catch (error) {
       if (error instanceof ChatSDKError) {

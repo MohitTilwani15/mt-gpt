@@ -4,6 +4,7 @@ import { fetchJson } from '@/lib/http';
 
 export interface CreateChatRequest {
   id: string;
+  assistantId?: string;
 }
 
 export interface Chat {
@@ -14,6 +15,7 @@ export interface Chat {
   updatedAt: string;
   isPublic?: boolean;
   isArchived?: boolean;
+  assistantId?: string | null;
 }
 
 export interface ChatResponse {

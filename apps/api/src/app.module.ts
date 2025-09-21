@@ -7,6 +7,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { DatabaseModule } from './database/database.module';
 import { DATABASE_CONNECTION } from './database/database-connection';
 import { ChatModule } from './chat/chat.module';
+import { AssistantModule } from './assistant/assistant.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -14,6 +15,7 @@ import { AppController } from './app.controller';
     ConfigModule.forRoot(),
     DatabaseModule,
     ChatModule,
+    AssistantModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, ConfigModule],
       useFactory: (database: NodePgDatabase, configService: ConfigService) => ({

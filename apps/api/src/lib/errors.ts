@@ -15,7 +15,9 @@ export type Surface =
   | 'history'
   | 'vote'
   | 'document'
-  | 'suggestions';
+  | 'document'
+  | 'suggestions'
+  | 'assistant';
 
 export type ErrorCode = `${ErrorType}:${Surface}`;
 
@@ -31,6 +33,7 @@ export const visibilityBySurface: Record<Surface, ErrorVisibility> = {
   vote: 'response',
   document: 'response',
   suggestions: 'response',
+  assistant: 'response',
 };
 
 export class ChatSDKError extends Error {
@@ -107,6 +110,11 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
       return 'You need to sign in to view this document. Please sign in and try again.';
     case 'bad_request:document':
       return 'The request to create or update the document was invalid. Please check your input and try again.';
+
+    case 'not_found:assistant':
+      return 'The requested assistant could not be found.';
+    case 'forbidden:assistant':
+      return 'You do not have access to this assistant.';
 
     default:
       return 'Something went wrong. Please try again later.';

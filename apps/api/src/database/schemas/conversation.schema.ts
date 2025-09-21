@@ -6,6 +6,7 @@ import { UIMessage } from "ai";
 import type { LanguageModelV2Usage } from "@ai-sdk/provider";
 
 import { user } from "./auth.schema";
+import { assistant } from './assistant.schema';
 import { MyProviderMetadata } from '../../lib/message-type'
 
 export const chat = pgTable('Chat', {
@@ -15,6 +16,7 @@ export const chat = pgTable('Chat', {
   userId: text('userId')
     .notNull()
     .references(() => user.id),
+  assistantId: uuid('assistantId').references(() => assistant.id, { onDelete: 'set null' }),
   lastContext: jsonb('lastContext').$type<LanguageModelV2Usage | null>(),
   isPublic: boolean('isPublic').notNull().default(false),
   isArchived: boolean('isArchived').notNull().default(false),
@@ -137,9 +139,13 @@ export const document = pgTable('Document', {
 
 export type Document = InferSelectModel<typeof document>;
 
-export const chatRelations = relations(chat, ({ many }) => ({
+export const chatRelations = relations(chat, ({ many, one }) => ({
   messages: many(message),
   documents: many(document),
+  assistant: one(assistant, {
+    fields: [chat.assistantId],
+    references: [assistant.id],
+  }),
 }));
 
 export const messageRelations = relations(message, ({ one, many }) => ({

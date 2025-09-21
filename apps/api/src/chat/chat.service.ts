@@ -33,6 +33,9 @@ import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
 import { LinkUpSoWebSearchToolService } from '../lib/tools/linkup-so-web-search.tool'
 import { Mem0MemoryService } from './services/mem0-memory.service';
 import { CloudflareAIGatewayService } from 'src/services/cloudflare-ai-gateway.service';
+import { AssistantQueryService } from 'src/database/queries/assistant.query';
+import { AssistantKnowledgeQueryService } from 'src/database/queries/assistant-knowledge.query';
+import type { AssistantCapabilities } from 'src/database/schemas/assistant.schema';
 
 @Injectable()
 export class ChatService {
@@ -44,14 +47,78 @@ export class ChatService {
     private readonly linkupsoWebSearchToolService: LinkUpSoWebSearchToolService,
     private readonly mem0MemoryService: Mem0MemoryService,
     private readonly cloudflareAIGatewayService: CloudflareAIGatewayService,
+    private readonly assistantQueryService: AssistantQueryService,
+    private readonly assistantKnowledgeQueryService: AssistantKnowledgeQueryService,
   ) {}
 
   async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
-    const { id, message, selectedChatModel, enableReasoning } = requestBody;
+    const { id, message, enableReasoning, selectedChatModel } = requestBody;
+
+    let effectiveModel = selectedChatModel ?? ChatModel.GPT_4O;
+    let assistantContext: {
+      instructions?: string | null;
+      knowledgeSnippet?: string | null;
+      capabilities?: AssistantCapabilities | null;
+      assistantId?: string;
+      name?: string;
+    } | undefined;
 
     const existingChat = await this.chatQueryService.getChatById({ id });
     if (existingChat && existingChat.userId !== session.user.id) {
       throw new ChatSDKError('forbidden:chat');
+    }
+
+    if (requestBody.assistantId) {
+      const assistant = await this.assistantQueryService.getAssistantForUser(
+        requestBody.assistantId,
+        session.user.id,
+      );
+
+      if (!assistant) {
+        throw new ChatSDKError('not_found:assistant');
+      }
+
+      const isValidModel = (value?: string | null): value is ChatModel =>
+        Boolean(value) && (Object.values(ChatModel) as string[]).includes(value as string);
+
+      if (!requestBody.selectedChatModel && isValidModel(assistant.defaultModel)) {
+        effectiveModel = assistant.defaultModel as ChatModel;
+      }
+
+      if (existingChat?.assistantId && existingChat.assistantId !== assistant.id) {
+        throw new ChatSDKError('bad_request:chat', 'Chat already linked to another assistant');
+      }
+
+      if (existingChat && !existingChat.assistantId) {
+        await this.chatQueryService.assignAssistantToChat({
+          chatId: existingChat.id,
+          assistantId: assistant.id,
+        });
+      } else if (!existingChat) {
+        await this.chatQueryService.assignAssistantToChat({
+          chatId: id,
+          assistantId: assistant.id,
+        }).catch(() => undefined);
+      }
+
+      const knowledgeRecords = await this.assistantKnowledgeQueryService.listKnowledge(assistant.id);
+      const knowledgeSnippets = knowledgeRecords
+        .filter((record) => record.text && record.text.trim())
+        .slice(0, 5)
+        .map((record) => {
+          const truncated = record.text!.trim().slice(0, 1600);
+          return `- ${record.fileName}: ${truncated}`;
+        });
+
+      assistantContext = {
+        instructions: assistant.instructions ?? null,
+        knowledgeSnippet: knowledgeSnippets.length
+          ? `Long-term assistant knowledge:\n${knowledgeSnippets.join('\n')}`
+          : null,
+        capabilities: assistant.capabilities ?? {},
+        assistantId: assistant.id,
+        name: assistant.name,
+      };
     }
 
     const userQueryText = this.extractTextFromParts(message.parts || []);
@@ -93,12 +160,13 @@ export class ChatService {
       return this.generateAIResponse({
         chatId: id,
         messages,
-        selectedChatModel,
+        selectedChatModel: effectiveModel,
         message,
         abortSignal,
         userId: session.user.id,
         additionalSystemContext: memoryContext,
         enableReasoning: Boolean(enableReasoning),
+        assistantContext,
       });
     });
 
@@ -121,11 +189,12 @@ export class ChatService {
     });
   }
 
-  async createNewChat(chatId: string, session: UserSession) {
+  async createNewChat(chatId: string, session: UserSession, assistantId?: string) {
     const chat = await this.chatQueryService.createChat({
       id: chatId,
       userId: session.user.id,
       title: 'New Chat',
+      assistantId: assistantId ?? undefined,
     });
 
     return {
@@ -133,6 +202,7 @@ export class ChatService {
       title: chat.title,
       userId: session.user.id,
       createdAt: chat.createdAt,
+      assistantId: chat.assistantId,
     };
   }
 
@@ -262,6 +332,7 @@ export class ChatService {
     userId,
     additionalSystemContext,
     enableReasoning,
+    assistantContext,
   }: {
     chatId: string;
     messages: UIMessage[];
@@ -271,6 +342,13 @@ export class ChatService {
     userId: string;
     additionalSystemContext?: string;
     enableReasoning?: boolean;
+    assistantContext?: {
+      instructions?: string | null;
+      knowledgeSnippet?: string | null;
+      capabilities?: AssistantCapabilities | null;
+      assistantId?: string;
+      name?: string;
+    };
   }) {
     let finalUsage: LanguageModelUsage | undefined;
 
@@ -316,9 +394,37 @@ export class ChatService {
         //   model = openai(selectedChatModel || 'gpt-4o');
         // }
 
-        const systemPrompt = [this.getSystemPrompt(), additionalSystemContext]
-          .filter(Boolean)
-          .join('');
+        const systemPromptParts = [this.getSystemPrompt()];
+
+        if (assistantContext?.instructions) {
+          systemPromptParts.push(
+            `You are acting as the specialised assistant "${assistantContext.name ?? 'Custom Assistant'}". ` +
+            `Follow these instructions carefully:\n${assistantContext.instructions.trim()}`,
+          );
+        }
+
+        const combinedAdditionalContext = [
+          additionalSystemContext,
+          assistantContext?.knowledgeSnippet,
+        ]
+          .filter((value): value is string => Boolean(value && value.trim()))
+          .join('\n\n');
+
+        if (combinedAdditionalContext) {
+          systemPromptParts.push(`Additional helpful context:\n${combinedAdditionalContext}`);
+        }
+
+        const systemPrompt = systemPromptParts.join('\n\n');
+
+        const enableWebSearch = assistantContext?.capabilities
+          ? assistantContext.capabilities.webSearch !== false
+          : true;
+
+        const tools = enableWebSearch
+          ? {
+              webSearch: this.linkupsoWebSearchToolService.askLinkupTool(),
+            }
+          : undefined;
 
         const result = streamText({
           model: this.cloudflareAIGatewayService.aigateway([openai(selectedChatModel || 'gpt-4o')]),
@@ -333,11 +439,10 @@ export class ChatService {
               userId: userId,
               chatId: chatId,
               model: selectedChatModel,
+              assistantId: assistantContext?.assistantId,
             },
           },
-          tools: {
-            webSearch: this.linkupsoWebSearchToolService.askLinkupTool()
-          },
+          ...(tools ? { tools } : {}),
           ...(reasoningAllowed ? { reasoning: { effort: 'medium' as const } } : {}),
           providerOptions: reasoningAllowed
             ? {

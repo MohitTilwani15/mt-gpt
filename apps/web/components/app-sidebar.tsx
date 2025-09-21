@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageSquare, User, LogOut } from "lucide-react"
+import { Home, MessageSquare, LogOut, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -23,6 +23,11 @@ const items = [
     title: "Home",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Assistants",
+    url: "/assistants",
+    icon: Sparkles,
   },
 ]
 

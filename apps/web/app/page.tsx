@@ -5,13 +5,22 @@ import {
   FormEventHandler,
   useState,
   useCallback,
+  useEffect,
 } from "react";
 import { useRouter } from "next/navigation";
 import { UIMessage, FileUIPart } from "ai";
 
 import ErrorBoundary from "@/components/error-boundary";
 import ChatInput from "@/components/chat-input";
-import { useSelectedModel, createChat, useFileUpload } from "@/hooks/index";
+import { useAssistants, useSelectedModel, createChat, useFileUpload } from "@/hooks/index";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import { Label } from "@workspace/ui/components/label";
 
 interface UploadedFile {
   id: string;
@@ -28,6 +37,7 @@ export default function Page() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [chatId] = useState<string>(() => uuidv4());
   const { isUploading: isFileUploading, uploadFiles } = useFileUpload();
+  const { data: assistants = [] } = useAssistants();
   
   const {
     selectedModel,
@@ -35,6 +45,19 @@ export default function Page() {
     availableModels: supportedModels,
     isLoading: isLoadingModels
   } = useSelectedModel();
+
+  const [selectedAssistantId, setSelectedAssistantId] = useState<string>("");
+
+  useEffect(() => {
+    if (!selectedAssistantId) {
+      return;
+    }
+
+    const assistant = assistants.find((item) => item.id === selectedAssistantId);
+    if (assistant?.defaultModel) {
+      setSelectedModel(assistant.defaultModel);
+    }
+  }, [selectedAssistantId, assistants, setSelectedModel]);
 
   const handleFileUpload = useCallback(
     async (files: FileList) => {
@@ -92,10 +115,17 @@ export default function Page() {
       
       try {
         await createChat({
-          id: chatId
+          id: chatId,
+          assistantId: selectedAssistantId || undefined,
         });
         
-        sessionStorage.setItem(`chat-${chatId}`, JSON.stringify(initialMessage));
+        sessionStorage.setItem(
+          `chat-${chatId}`,
+          JSON.stringify({
+            message: initialMessage,
+            assistantId: selectedAssistantId || null,
+          }),
+        );
         
         setText("");
         setUploadedFiles([]);
@@ -118,6 +148,33 @@ export default function Page() {
               <p className="text-lg text-muted-foreground">
                 Start a conversation by typing a message below
               </p>
+            </div>
+
+            <div className="mb-6 space-y-2 text-left">
+              <Label className="text-sm font-medium text-foreground">Assistant</Label>
+              <Select
+                value={selectedAssistantId || 'none'}
+                onValueChange={(value) => setSelectedAssistantId(value === 'none' ? '' : value)}
+              >
+                <SelectTrigger className="w-full justify-between">
+                  <SelectValue placeholder="No assistant" />
+                </SelectTrigger>
+                <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                  <SelectItem value="none">No assistant</SelectItem>
+                  {assistants.map((assistant) => (
+                    <SelectItem key={assistant.id} value={assistant.id}>
+                      {assistant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedAssistantId ? (
+                <p className="text-xs text-muted-foreground">
+                  Using assistant {assistants.find((a) => a.id === selectedAssistantId)?.name ?? selectedAssistantId}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Messages will use the default assistant settings.</p>
+              )}
             </div>
             
             <div className="relative">
