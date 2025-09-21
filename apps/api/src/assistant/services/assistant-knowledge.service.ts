@@ -46,7 +46,13 @@ export class AssistantKnowledgeService {
   }
 
   async uploadKnowledge(params: UploadKnowledgeParams) {
-    const { assistantId, files, extractText: shouldExtractText = false, userId } = params;
+    const {
+      assistantId,
+      files,
+      extractText: shouldExtractTextInput,
+      userId,
+    } = params;
+    const shouldExtractText = shouldExtractTextInput ?? true;
 
     if (!files || files.length === 0) {
       throw new BadRequestException('No files provided');
@@ -88,14 +94,20 @@ export class AssistantKnowledgeService {
         } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
           const result = await mammoth.extractRawText({ buffer: file.buffer });
           textContent = result.value;
+        } else if (file.mimetype?.startsWith('text/')) {
+          textContent = file.buffer.toString('utf8');
         }
 
         if (textContent && textContent.trim()) {
+          textContent = textContent.trim();
           const { embedding: computedEmbedding } = await embed({
             model: openai.embedding(this.configService.getOrThrow<string>('EMBEDDING_MODEL')),
             value: textContent,
           });
-          embedding = computedEmbedding;
+          if (computedEmbedding) {
+            const asArray = Array.from(computedEmbedding);
+            embedding = asArray.length ? asArray : null;
+          }
         }
       }
 
