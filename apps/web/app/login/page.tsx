@@ -9,18 +9,19 @@ import { authClient } from "@/lib/auth-client";
 export default function LoginPage() {
   const router = useRouter();
   const { data: session, isPending: isLoading } = authClient.useSession();
+  const isAuthenticated = Boolean(session?.user);
   const [activeForm, setActiveForm] = useState<"login" | "signup">("login");
 
   useEffect(() => {
-    if (!isLoading && session) {
+    if (isAuthenticated) {
       router.replace("/");
     }
-  }, [isLoading, session, router]);
+  }, [isAuthenticated, router]);
 
-  if (isLoading || session) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen text-sm text-muted-foreground">
-        Redirecting...
+        Loading...
       </div>
     );
   }
