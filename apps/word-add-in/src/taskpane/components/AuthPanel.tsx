@@ -52,10 +52,6 @@ const useStyles = makeStyles({
   tabList: {
     marginBottom: "4px",
   },
-  googleLogo: {
-    width: "18px",
-    height: "18px",
-  },
 });
 
 const useErrorMessage = (error: unknown) => {
@@ -123,20 +119,6 @@ const SignInForm: React.FC = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    try {
-      await authClient.signIn.social({
-        provider: "google",
-        callbackURL: typeof window !== "undefined" ? window.location.href : undefined,
-      });
-      triggerSessionRefresh();
-    } catch (err) {
-      console.error("Google sign-in failed", err);
-      setError(err);
-    }
-  };
-
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       {errorMessage && (
@@ -152,18 +134,6 @@ const SignInForm: React.FC = () => {
           </MessageBarActions>
         </MessageBar>
       )}
-
-      <Button
-        appearance="secondary"
-        onClick={handleGoogleSignIn}
-        type="button"
-        className={styles.externalButton}
-      >
-        <span className={styles.buttonContent}>
-          <img alt="Google" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className={styles.googleLogo} />
-          Continue with Google
-        </span>
-      </Button>
 
       <Field label="Email address" required>
         <Input
@@ -234,21 +204,6 @@ const SignUpForm: React.FC = () => {
     }
   };
 
-  const handleGoogleSignUp = async () => {
-    setError(null);
-    try {
-      await authClient.signIn.social({
-        provider: "google",
-        requestSignUp: true,
-        callbackURL: typeof window !== "undefined" ? window.location.href : undefined,
-      });
-      triggerSessionRefresh();
-    } catch (err) {
-      console.error("Google sign-up failed", err);
-      setError(err);
-    }
-  };
-
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       {errorMessage && (
@@ -264,18 +219,6 @@ const SignUpForm: React.FC = () => {
           </MessageBarActions>
         </MessageBar>
       )}
-
-      <Button
-        appearance="secondary"
-        onClick={handleGoogleSignUp}
-        type="button"
-        className={styles.externalButton}
-      >
-        <span className={styles.buttonContent}>
-          <img alt="Google" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className={styles.googleLogo} />
-          Continue with Google
-        </span>
-      </Button>
 
       <Field label="Full name" required>
         <Input

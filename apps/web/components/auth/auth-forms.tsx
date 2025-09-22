@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import Image from "next/image";
 import { Loader2Icon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@workspace/ui/components/button";
@@ -39,39 +38,9 @@ export function LoginForm() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    try {
-      await authClient.signIn.social({
-        provider: 'google',
-        callbackURL: '/'
-      });
-    } catch (error) {
-      console.error("Google sign in failed:", error);
-    }
-  };
-
   return (
     <div className="space-y-4 max-w-md mx-auto">
       <h2 className="text-2xl font-bold">Sign In</h2>
-      
-      {/* Google Sign In Button */}
-      <Button
-        onClick={handleGoogleSignIn}
-        variant="outline"
-        className="w-full"
-      >
-        <Image src="/google.svg" alt="Google" width={20} height={20} />
-        Sign in with Google
-      </Button>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-black text-gray-500">Or continue with</span>
-        </div>
-      </div>
 
       <form onSubmit={handleSubmit((data) => handleEmailSignIn(data.email, data.password))} className="space-y-4">
         <div>
@@ -137,40 +106,9 @@ export function SignUpForm() {
     }
   };
 
-  const handleGoogleSignUp = async () => {
-    try {
-      await authClient.signIn.social({
-        provider: 'google',
-        requestSignUp: true,
-        callbackURL: '/'
-      });
-    } catch (error) {
-      console.error("Google sign up failed:", error);
-    }
-  };
-
   return (
     <div className="space-y-4 max-w-md mx-auto">
       <h2 className="text-2xl font-bold">Sign Up</h2>
-      
-      {/* Google Sign Up Button */}
-      <Button
-        onClick={handleGoogleSignUp}
-        variant="outline"
-        className="w-full"
-      >
-        <Image src="/google.svg" alt="Google" width={20} height={20} />
-        Sign up with Google
-      </Button>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-black text-gray-500">Or continue with</span>
-        </div>
-      </div>
 
       <form onSubmit={handleSubmit((data) => handleEmailSignUp(data.email, data.password, data.name))} className="space-y-4">
         <div>

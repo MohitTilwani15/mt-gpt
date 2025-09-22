@@ -39,13 +39,6 @@ import { AppController } from './app.controller';
           emailAndPassword: {
             enabled: true,
           },
-          socialProviders: {
-            google: {
-              clientId: configService.getOrThrow('GOOGLE_CLIENT_ID'),
-              clientSecret: configService.getOrThrow('GOOGLE_CLIENT_SECRET'),
-              redirectURI: configService.getOrThrow('GOOGLE_REDIRECT_URI'),
-            },
-          },
         }),
       }),
       inject: [DATABASE_CONNECTION, ConfigService],
