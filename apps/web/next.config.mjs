@@ -1,5 +1,4 @@
 /** @type {import('next').NextConfig} */
-const backendUrl = process.env.NEXT_PUBLIC_API_URL;
 
 const nextConfig = {
   reactStrictMode: false,
@@ -10,16 +9,6 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "@workspace/ui"],
-  },
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/api/auth/:path*',
-          destination: `${backendUrl}/api/auth/:path*`,
-        },
-      ],
-    };
   },
 };
 
