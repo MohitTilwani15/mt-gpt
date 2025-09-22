@@ -33,7 +33,6 @@ import { AppController } from './app.controller';
               secure: true,
               httpOnly: true,
               sameSite: 'none',
-              domain: 'mt-gpt-production.up.railway.app',
             },
           },
           emailAndPassword: {
