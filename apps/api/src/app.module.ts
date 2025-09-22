@@ -23,7 +23,11 @@ import { AppController } from './app.controller';
           database: drizzleAdapter(database, {
             provider: 'pg',
           }),
-          trustedOrigins: [configService.getOrThrow('FRONTEND_URL'), 'https://localhost:3000'],
+          trustedOrigins: [
+            configService.getOrThrow('FRONTEND_URL'),
+            'https://localhost:3000', // Local word add-in
+            'http://localhost:3001' // Local web
+          ],
           advanced: {
             defaultCookieAttributes: {
               secure: true,
