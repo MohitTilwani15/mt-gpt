@@ -33,6 +33,7 @@ import { AppController } from './app.controller';
               secure: true,
               httpOnly: true,
               sameSite: 'none',
+              domain: configService.getOrThrow('COOKIE_DOMAIN'),
             },
           },
           emailAndPassword: {
