@@ -1,34 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { LoginForm, SignUpForm } from "@/components/auth/auth-forms";
 import { authClient } from "@/lib/auth-client";
 
-export default function Home() {
+export default function LoginPage() {
+  const router = useRouter();
   const { data: session, isPending: isLoading } = authClient.useSession();
   const [activeForm, setActiveForm] = useState<"login" | "signup">("login");
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        Loading...
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!isLoading && session) {
+      router.replace("/");
+    }
+  }, [isLoading, session, router]);
 
-  if (session) {
+  if (isLoading || session) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-md mx-auto text-center">
-          <h1 className="text-3xl font-bold mb-4">Welcome!</h1>
-          <p className="mb-4">You are signed in as: {session.user?.email}</p>
-          <button
-            onClick={() => authClient.signOut()}
-            className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700"
-          >
-            Sign Out
-          </button>
-        </div>
+      <div className="flex justify-center items-center min-h-screen text-sm text-muted-foreground">
+        Redirecting...
       </div>
     );
   }
@@ -41,7 +33,7 @@ export default function Home() {
             onClick={() => setActiveForm("login")}
             className={`px-4 py-2 rounded-md ${
               activeForm === "login"
-                ? "bg-black shadow-sm"
+                ? "bg-black shadow-sm text-white"
                 : "text-gray-600 hover:text-gray-800"
             }`}
           >
@@ -51,7 +43,7 @@ export default function Home() {
             onClick={() => setActiveForm("signup")}
             className={`px-4 py-2 rounded-md ${
               activeForm === "signup"
-                ? "bg-black shadow-sm"
+                ? "bg-black shadow-sm text-white"
                 : "text-gray-600 hover:text-gray-800"
             }`}
           >
