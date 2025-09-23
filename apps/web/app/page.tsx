@@ -136,7 +136,6 @@ export default function Page() {
       }
     }
   };
-
   
   return (
     <ErrorBoundary>

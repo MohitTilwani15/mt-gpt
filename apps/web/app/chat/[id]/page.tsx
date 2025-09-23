@@ -34,7 +34,7 @@ interface UploadedFile {
 }
 
 export default function ChatPage() {
-  const { chat, setChatContext } = useSharedChatContext();
+  const { chat, setChatContext, clearChat } = useSharedChatContext();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const chatId = params.id;
@@ -101,6 +101,10 @@ export default function ChatPage() {
       reasoningEnabled: effectiveReasoningEnabled,
       assistantId: activeAssistantId,
     });
+
+    return () => {
+      clearChat();
+    };
   }, [chatId, selectedModel, effectiveReasoningEnabled, activeAssistantId]);
 
   useEffect(() => {
@@ -218,6 +222,7 @@ export default function ChatPage() {
   };
 
   const handleBack = () => {
+    clearChat();
     router.push("/");
   };
 
