@@ -64,6 +64,7 @@ async function bootstrap() {
   expressApp.use(require('express').json());
 
   app.setGlobalPrefix('api');
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
   await app.listen(3000);
 }
 bootstrap();
