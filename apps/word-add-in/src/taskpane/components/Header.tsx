@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Image, tokens, makeStyles } from "@fluentui/react-components";
 
 export interface HeaderProps {
   title: string;
@@ -7,30 +6,14 @@ export interface HeaderProps {
   message: string;
 }
 
-const useStyles = makeStyles({
-  welcome__header: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    paddingBottom: "30px",
-    paddingTop: "100px",
-    backgroundColor: tokens.colorNeutralBackground3,
-  },
-  message: {
-    fontSize: tokens.fontSizeHero900,
-    fontWeight: tokens.fontWeightRegular,
-    fontColor: tokens.colorNeutralBackgroundStatic,
-  },
-});
-
-const Header: React.FC<HeaderProps> = (props: HeaderProps) => {
-  const { title, logo, message } = props;
-  const styles = useStyles();
-
+const Header: React.FC<HeaderProps> = ({ title, logo, message }) => {
   return (
-    <section className={styles.welcome__header}>
-      <Image width="90" height="90" src={logo} alt={title} />
-      <h1 className={styles.message}>{message}</h1>
+    <section className="flex flex-col items-center gap-4 rounded-2xl border border-border/50 bg-card px-8 py-10 text-center shadow-sm">
+      <img src={logo} alt={title} className="h-20 w-20 rounded-full border border-border/70 bg-background object-contain" />
+      <h1 className="text-2xl font-semibold tracking-tight">{message}</h1>
+      <p className="text-sm text-muted-foreground max-w-md">
+        {title}
+      </p>
     </section>
   );
 };
