@@ -1,5 +1,7 @@
 /* eslint-disable no-undef */
 
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
@@ -31,6 +33,16 @@ module.exports = async (env, options) => {
     },
     resolve: {
       extensions: [".ts", ".tsx", ".html", ".js"],
+      alias: {
+        "@": path.resolve(__dirname, "../web"),
+        "next/navigation": path.resolve(
+          __dirname,
+          "./src/taskpane/lib/next-navigation",
+        ),
+        "@workspace/ui": path.resolve(__dirname, "../../packages/ui/src"),
+        "@workspace/client": path.resolve(__dirname, "../../packages/client/src"),
+        "@workspace/utils": path.resolve(__dirname, "../../packages/utils/src"),
+      },
     },
     module: {
       rules: [
@@ -57,6 +69,26 @@ module.exports = async (env, options) => {
           generator: {
             filename: "assets/[name][ext][query]",
           },
+        },
+        {
+          test: /\.css$/,
+          use: [
+            require.resolve("style-loader"),
+            {
+              loader: require.resolve("css-loader"),
+              options: {
+                importLoaders: 1,
+              },
+            },
+            {
+              loader: require.resolve("postcss-loader"),
+              options: {
+                postcssOptions: {
+                  config: path.resolve(__dirname, "postcss.config.mjs"),
+                },
+              },
+            },
+          ],
         },
       ],
     },
@@ -90,11 +122,7 @@ module.exports = async (env, options) => {
         template: "./src/commands/commands.html",
         chunks: ["polyfill", "commands"],
       }),
-      new webpack.ProvidePlugin({
-        Promise: ["es6-promise", "Promise"],
-      }),
       new webpack.DefinePlugin({
-        "process.env.NEXT_PUBLIC_API_URL": JSON.stringify(process.env.NEXT_PUBLIC_API_URL || ""),
         "process.env.WORD_ADDIN_API_URL": JSON.stringify(process.env.WORD_ADDIN_API_URL || ""),
       }),
     ],

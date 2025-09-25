@@ -23,8 +23,8 @@ import {
   deleteAssistantKnowledge,
   shareAssistant,
   revokeAssistantShare,
-} from "@/hooks/use-assistants";
-import { authClient } from "@/lib/auth-client";
+} from "@workspace/client";
+import { authClient } from "@/auth/auth-client";
 
 interface AssistantPageProps {
   params: Promise<{ id: string }>;

@@ -1,9 +1,9 @@
 import * as React from "react";
-import { tokens, makeStyles } from "@fluentui/react-components";
 
 export interface HeroListItem {
-  icon: React.JSX.Element;
+  icon: React.ReactNode;
   primaryText: string;
+  secondaryText?: string;
 }
 
 export interface HeroListProps {
@@ -11,50 +11,23 @@ export interface HeroListProps {
   items: HeroListItem[];
 }
 
-const useStyles = makeStyles({
-  list: {
-    marginTop: "20px",
-  },
-  listItem: {
-    paddingBottom: "20px",
-    display: "flex",
-  },
-  icon: {
-    marginRight: "10px",
-  },
-  itemText: {
-    fontSize: tokens.fontSizeBase300,
-    fontColor: tokens.colorNeutralBackgroundStatic,
-  },
-  welcome__main: {
-    width: "100%",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-  },
-  message: {
-    fontSize: tokens.fontSizeBase500,
-    fontColor: tokens.colorNeutralBackgroundStatic,
-    fontWeight: tokens.fontWeightRegular,
-    paddingLeft: "10px",
-    paddingRight: "10px",
-  },
-});
-
-const HeroList: React.FC<HeroListProps> = (props: HeroListProps) => {
-  const { items, message } = props;
-  const styles = useStyles();
-
-  const listItems = items.map((item, index) => (
-    <li className={styles.listItem} key={index}>
-      <i className={styles.icon}>{item.icon}</i>
-      <span className={styles.itemText}>{item.primaryText}</span>
-    </li>
-  ));
+const HeroList: React.FC<HeroListProps> = ({ message, items }) => {
   return (
-    <div className={styles.welcome__main}>
-      <h2 className={styles.message}>{message}</h2>
-      <ul className={styles.list}>{listItems}</ul>
+    <div className="flex flex-col gap-6 rounded-2xl border border-border/50 bg-muted/20 p-6">
+      <h2 className="text-lg font-semibold text-foreground">{message}</h2>
+      <ul className="space-y-4">
+        {items.map((item, index) => (
+          <li key={index} className="flex items-start gap-4 rounded-xl border border-border/40 bg-background px-4 py-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+              {item.icon}
+            </div>
+            <div>
+              <p className="text-base font-medium text-foreground">{item.primaryText}</p>
+              {item.secondaryText && <p className="text-sm text-muted-foreground">{item.secondaryText}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

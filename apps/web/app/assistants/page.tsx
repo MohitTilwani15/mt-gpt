@@ -14,15 +14,15 @@ import { Separator } from "@workspace/ui/components/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { Badge } from "@workspace/ui/components/badge";
 
-import { useSelectedModel } from "@/hooks/use-selected-model";
-import { authClient } from "@/lib/auth-client";
+import { useSelectedModel } from "@workspace/client";
+import { authClient } from "@/auth/auth-client";
 
 import {
   useAssistants,
   createAssistant,
   AssistantSummary,
   uploadAssistantKnowledge,
-} from "@/hooks/use-assistants";
+} from "@workspace/client";
 
 export default function AssistantsPage() {
   const router = useRouter();

@@ -16,7 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@workspace/ui/components/sidebar"
-import { authClient } from "@/lib/auth-client"
+import { authClient } from "@/auth/auth-client"
 
 const items = [
   {

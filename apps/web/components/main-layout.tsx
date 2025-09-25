@@ -8,7 +8,7 @@ import {
   SidebarTrigger,
 } from "@workspace/ui/components/sidebar"
 import { AppSidebar } from "./app-sidebar"
-import { authClient } from "@/lib/auth-client"
+import { authClient } from "@/auth/auth-client"
 
 interface MainLayoutProps {
   children: React.ReactNode

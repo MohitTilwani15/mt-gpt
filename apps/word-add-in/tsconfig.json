@@ -1,27 +1,34 @@
 {
   "compilerOptions": {
     "allowUnusedLabels": false,
-    "emitDecoratorMetadata": true,
     "esModuleInterop": true,
-    "experimentalDecorators": true,
     "forceConsistentCasingInFileNames": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "module": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "Bundler",
     "noImplicitReturns": true,
     "noUnusedParameters": true,
     "outDir": "dist",
     "removeComments": false,
     "sourceMap": true,
-    "target": "es5",
+    "target": "ES2020",
     "lib": [
-      "es7",
-      "dom"
+      "ES2020",
+      "DOM"
     ],
     "pretty": true,
     "typeRoots": [
       "node_modules/@types"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../web/*"],
+      "@workspace/ui/*": ["../../packages/ui/src/*"],
+      "@workspace/client": ["../../packages/client/src/index.ts"],
+      "@workspace/client/*": ["../../packages/client/src/*"],
+      "@workspace/utils": ["../../packages/utils/src/index.ts"],
+      "@workspace/utils/*": ["../../packages/utils/src/*"]
+    }
   },
   "exclude": [
     "node_modules"

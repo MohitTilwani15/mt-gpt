@@ -1,0 +1,28 @@
+'use client';
+
+import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent,
+} from '@workspace/ui/components/ui/shadcn-io/ai/reasoning';
+
+export interface MessageReasoningProps {
+  isLoading: boolean;
+  reasoning: string;
+}
+
+export function MessageReasoning({ isLoading, reasoning }: MessageReasoningProps) {
+  return (
+    <Reasoning
+      isStreaming={isLoading}
+      defaultOpen={false}
+      autoOpenOnStreaming={false}
+      data-testid="message-reasoning"
+    >
+      <ReasoningTrigger />
+      <ReasoningContent>{reasoning}</ReasoningContent>
+    </Reasoning>
+  );
+}
+
+export default MessageReasoning;

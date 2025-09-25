@@ -3,10 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 import { MainLayout } from "@/components/main-layout"
-import SWRProvider from "@/components/swr-provider"
+import { SWRProvider } from "@workspace/client/providers"
 import { ConditionalHeaderActions } from "@/components/conditional-header-actions"
-import CommandK from "@/components/command-k"
-import { ChatProvider } from "@/providers/chat-context"
+import { AppCommandK } from "@/components/app-command-k"
+import { ChatProvider } from "@workspace/client/providers"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -33,7 +33,7 @@ export default function RootLayout({
             <ChatProvider>
               <MainLayout headerActions={<ConditionalHeaderActions />}>
                 {children}
-                <CommandK />
+                <AppCommandK />
               </MainLayout>
             </ChatProvider>
           </SWRProvider>
