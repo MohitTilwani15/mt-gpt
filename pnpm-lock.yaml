@@ -448,6 +448,9 @@ importers:
       '@workspace/ui':
         specifier: workspace:*
         version: link:../ui
+      '@workspace/utils':
+        specifier: workspace:*
+        version: link:../utils
       ai:
         specifier: ^5.0.52
         version: 5.0.52(zod@4.1.8)
@@ -460,9 +463,15 @@ importers:
       react:
         specifier: ^19.1.1
         version: 19.1.1
+      react-hook-form:
+        specifier: ^7.62.0
+        version: 7.62.0(react@19.1.1)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      streamdown:
+        specifier: ^1.2.0
+        version: 1.2.0(@types/react@19.1.9)(react@19.1.1)
       swr:
         specifier: ^2.3.6
         version: 2.3.6(react@19.1.1)

@@ -1,14 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { BotIcon } from 'lucide-react';
 import { Streamdown } from 'streamdown';
-import { useVotes } from '@workspace/client';
-import type { Vote } from '@workspace/client';
-import type { MessageDocument } from '@workspace/client/types/chat';
 
+import { useVotes } from '../hooks';
+import type { Vote } from '../hooks';
+import type { MessageDocument } from '../types/chat';
 import {
   Message,
   MessageContent,
@@ -18,29 +17,29 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
-import { useSharedChatContext } from '@workspace/client/providers';
-import { MessageReasoning, MessageActions } from '@workspace/client/components';
-import { DocumentAttachments, DocumentPreview } from '@workspace/client/components';
+import { useSharedChatContext } from '../providers';
+import { MessageReasoning } from './message-reasoning';
+import { MessageActions } from './message-actions';
+import { DocumentAttachments } from './document-attachments';
+import { DocumentPreview } from './document-preview';
 
-interface MessageListProps {
+export interface MessageListProps {
   chatId: string;
   onRegenerate?: () => void;
   enableVoting?: boolean;
   enableFork?: boolean;
+  onNavigate?: (path: string) => void;
 }
 
-
-export default function MessageList({
+export function MessageList({
   chatId,
   onRegenerate,
   enableVoting = true,
   enableFork = true,
+  onNavigate,
 }: MessageListProps) {
-  const router = useRouter();
   const { chat } = useSharedChatContext();
-  const { messages, status } = useChat({
-    chat,
-  });
+  const { messages, status } = useChat({ chat });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [previewDocument, setPreviewDocument] = useState<MessageDocument | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -52,7 +51,7 @@ export default function MessageList({
       return new Map<string, Vote>();
     }
 
-    return new Map<string, Vote>(votes.map((vote) => [vote.messageId, vote]));
+    return new Map<string, Vote>(votes.map((voteItem) => [voteItem.messageId, voteItem]));
   }, [votes]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -76,7 +75,7 @@ export default function MessageList({
 
   const handleClosePreview = useCallback(() => {
     setIsPreviewOpen(false);
-    
+
     setTimeout(() => {
       setPreviewDocument(null);
     }, 300);
@@ -118,21 +117,14 @@ export default function MessageList({
                           }
 
                           if (part.type === 'text' && part.text) {
-                            return (
-                              <Streamdown key={partKey}>
-                                {part.text}
-                              </Streamdown>
-                            );
+                            return <Streamdown key={partKey}>{part.text}</Streamdown>;
                           }
 
                           return null;
                         })}
                       </div>
 
-                      <DocumentAttachments
-                        message={message}
-                        onPreview={handleDocumentPreview}
-                      />
+                      <DocumentAttachments message={message} onPreview={handleDocumentPreview} />
                     </MessageContent>
                   </Message>
 
@@ -147,7 +139,7 @@ export default function MessageList({
                       className="pt-1"
                       enableVoting={enableVoting}
                       enableFork={enableFork}
-                      onNavigate={(path) => router.push(path)}
+                      onNavigate={onNavigate}
                     />
                   </div>
                 </div>
@@ -158,7 +150,7 @@ export default function MessageList({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
-      
+
       <DocumentPreview
         document={previewDocument}
         isOpen={isPreviewOpen}
@@ -167,3 +159,5 @@ export default function MessageList({
     </div>
   );
 }
+
+export default MessageList;

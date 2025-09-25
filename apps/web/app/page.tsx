@@ -10,8 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { UIMessage, FileUIPart } from "ai";
 
-import { ErrorBoundary } from "@workspace/client/components";
-import ChatInput from "@/components/chat-input";
+import { ErrorBoundary, ChatInput } from "@workspace/client/components";
 import { useAssistants, useSelectedModel, createChat, useFileUpload } from "@workspace/client";
 import {
   Select,

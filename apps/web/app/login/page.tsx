@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { LoginForm, SignUpForm } from "@/components/auth/auth-forms";
-import { authClient } from "@/auth/auth-client";
+import { LoginForm, SignUpForm } from "@workspace/client/components";
+import { useAuth } from "@workspace/client/providers";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { data: session, isPending: isLoading } = authClient.useSession();
+  const { session, isLoading } = useAuth();
   const isAuthenticated = Boolean(session?.user);
   const [activeForm, setActiveForm] = useState<"login" | "signup">("login");
 

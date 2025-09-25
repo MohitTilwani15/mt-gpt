@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, FormEventHandler } from 'react';
+import { useRef, type FormEventHandler } from 'react';
 import { PaperclipIcon } from 'lucide-react';
+import { useChat } from '@ai-sdk/react';
 
 import {
   PromptInput,
@@ -18,18 +19,17 @@ import {
 } from '@workspace/ui/components/ui/shadcn-io/ai/prompt-input';
 
 import { SUPPORTED_FILE_TYPES } from '@workspace/utils';
-import type { ChatModel } from '@workspace/client';
+import type { ChatModel } from '../hooks';
+import { StopButton } from './stop-button';
 import {
-  StopButton,
   TextInputAttachments,
   type AttachmentFile,
-} from '@workspace/client/components';
-import { useChat } from '@ai-sdk/react';
-import { useSharedChatContext } from '@workspace/client/providers';
+} from './text-input-attachments';
+import { useSharedChatContext } from '../providers';
 
-type UploadedFile = AttachmentFile;
+export type UploadedFile = AttachmentFile;
 
-interface ChatInputProps {
+export interface ChatInputProps {
   text: string;
   setText: (text: string) => void;
   model: string;
@@ -43,7 +43,7 @@ interface ChatInputProps {
   className?: string;
 }
 
-export default function ChatInput({
+export function ChatInput({
   text,
   setText,
   model,
@@ -63,7 +63,7 @@ export default function ChatInput({
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      onFileUpload(files);
+      void onFileUpload(files);
     }
     event.target.value = '';
   };
@@ -75,12 +75,10 @@ export default function ChatInput({
   return (
     <div className={`p-4 bg-background ${className || ''}`}>
       <PromptInput onSubmit={onSubmit}>
-        <TextInputAttachments
-          files={uploadedFiles}
-          onRemoveFile={onRemoveFile}
-        />
+        <TextInputAttachments files={uploadedFiles} onRemoveFile={onRemoveFile} />
+
         <PromptInputTextarea
-          onChange={(e) => setText(e.target.value)}
+          onChange={(event) => setText(event.target.value)}
           value={text}
           placeholder="Type your message..."
           disabled={status !== 'ready' || isFileUploading}
@@ -102,12 +100,9 @@ export default function ChatInput({
                 <PromptInputModelSelectValue />
               </PromptInputModelSelectTrigger>
               <PromptInputModelSelectContent>
-                {models.map((model) => (
-                  <PromptInputModelSelectItem
-                    key={model.id}
-                    value={model.id}
-                  >
-                    {model.name}
+                {models.map((item) => (
+                  <PromptInputModelSelectItem key={item.id} value={item.id}>
+                    {item.name}
                   </PromptInputModelSelectItem>
                 ))}
               </PromptInputModelSelectContent>
@@ -124,7 +119,6 @@ export default function ChatInput({
               }
             />
           )}
-          
         </PromptInputToolbar>
       </PromptInput>
 
@@ -139,3 +133,5 @@ export default function ChatInput({
     </div>
   );
 }
+
+export default ChatInput;

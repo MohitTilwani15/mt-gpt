@@ -13,9 +13,7 @@ import { UIMessage } from "ai";
 import { AIDevtools } from "ai-sdk-devtools";
 import { useRouter, useParams } from "next/navigation";
 
-import { ErrorBoundary, ChatHeader } from "@workspace/client/components";
-import MessageList from "@/components/message-list";
-import ChatInput from "@/components/chat-input";
+import { ErrorBoundary, ChatHeader, MessageList, ChatInput } from "@workspace/client/components";
 import { useSelectedModel, useFileUpload } from "@workspace/client";
 import { Button } from "@workspace/ui/components/button";
 import { useSharedChatContext } from "@workspace/client/providers";
@@ -276,6 +274,7 @@ export default function ChatPage() {
         <MessageList
           chatId={chatId}
           onRegenerate={handleRegenerate}
+          onNavigate={(path) => router.push(path)}
         />
 
         <ChatInput
