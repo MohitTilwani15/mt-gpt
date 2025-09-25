@@ -8,3 +8,4 @@ export * from './message-actions';
 export * from './pdf-preview-modal';
 export * from './document-attachments';
 export * from './document-preview';
+export * from './conversation-history';

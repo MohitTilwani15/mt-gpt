@@ -5,7 +5,7 @@ import { Providers } from "@/components/providers"
 import { MainLayout } from "@/components/main-layout"
 import { SWRProvider } from "@workspace/client/providers"
 import { ConditionalHeaderActions } from "@/components/conditional-header-actions"
-import CommandK from "@/components/command-k"
+import { AppCommandK } from "@/components/app-command-k"
 import { ChatProvider } from "@workspace/client/providers"
 
 const fontSans = Geist({
@@ -33,7 +33,7 @@ export default function RootLayout({
             <ChatProvider>
               <MainLayout headerActions={<ConditionalHeaderActions />}>
                 {children}
-                <CommandK />
+                <AppCommandK />
               </MainLayout>
             </ChatProvider>
           </SWRProvider>

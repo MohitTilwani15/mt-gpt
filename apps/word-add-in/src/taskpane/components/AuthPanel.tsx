@@ -6,7 +6,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 
-import { authClient } from "../lib/auth-client";
+import { authClient } from "../auth/auth-client";
 
 type AuthMode = "signin" | "signup";
 

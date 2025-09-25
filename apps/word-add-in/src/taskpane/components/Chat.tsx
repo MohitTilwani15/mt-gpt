@@ -36,7 +36,7 @@ import {
   fetchChatModels,
 } from "@workspace/client";
 
-import { authClient } from "../lib/auth-client";
+import { authClient } from "../auth/auth-client";
 import { AuthPanel } from "./AuthPanel";
 
 const LOCAL_STORAGE_KEY = "word-addin-selected-chat-model";

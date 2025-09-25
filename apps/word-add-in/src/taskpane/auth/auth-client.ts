@@ -1,9 +1,7 @@
 import { createAuthClient } from "better-auth/react";
 
-import { getApiBaseUrl } from "../utils/api";
-
 export const authClient = createAuthClient({
-  baseURL: getApiBaseUrl(),
+  baseURL: process.env.WORD_ADDIN_API_URL,
   basePath: "/api/auth",
   fetchOptions: {
     credentials: "include",

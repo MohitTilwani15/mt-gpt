@@ -1,11 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { ThemeProvider } from "next-themes"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider
+    <ThemeProvider
       attribute="class"
       defaultTheme="system"
       enableSystem
@@ -13,6 +13,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
       enableColorScheme
     >
       {children}
-    </NextThemesProvider>
+    </ThemeProvider>
   )
 }
