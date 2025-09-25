@@ -2,7 +2,7 @@ import {
   getApiBaseUrl as getSharedApiBaseUrl,
   resolveApiUrl,
   setApiBaseUrl,
-} from "@workspace/api";
+} from "@workspace/client/lib/api";
 
 const DEFAULT_BASE_URL = "https://mt-gpt-production.up.railway.app";
 

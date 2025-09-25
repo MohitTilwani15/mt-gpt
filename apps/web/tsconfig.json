@@ -5,10 +5,10 @@
     "paths": {
       "@/*": ["./*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"],
-      "@workspace/chat": ["../../packages/chat/src/index.ts"],
-      "@workspace/chat/*": ["../../packages/chat/src/*"],
-      "@workspace/api": ["../../packages/api/src/index.ts"],
-      "@workspace/api/*": ["../../packages/api/src/*"]
+      "@workspace/client/*": ["../../packages/client/src/*"],
+      "@workspace/client": ["../../packages/client/src/index.ts"],
+      "@workspace/utils": ["../../packages/utils/src/index.ts"],
+      "@workspace/utils/*": ["../../packages/utils/src/*"]
     },
     "plugins": [
       {

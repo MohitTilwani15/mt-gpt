@@ -34,7 +34,7 @@ import {
   createChat,
   createChatClient,
   fetchChatModels,
-} from "@workspace/chat";
+} from "@workspace/client";
 
 import { authClient } from "../lib/auth-client";
 import { AuthPanel } from "./AuthPanel";

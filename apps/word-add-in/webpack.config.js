@@ -34,9 +34,14 @@ module.exports = async (env, options) => {
     resolve: {
       extensions: [".ts", ".tsx", ".html", ".js"],
       alias: {
+        "@": path.resolve(__dirname, "../web"),
+        "next/navigation": path.resolve(
+          __dirname,
+          "./src/taskpane/lib/next-navigation",
+        ),
         "@workspace/ui": path.resolve(__dirname, "../../packages/ui/src"),
-        "@workspace/chat": path.resolve(__dirname, "../../packages/chat/src"),
-        "@workspace/api": path.resolve(__dirname, "../../packages/api/src"),
+        "@workspace/client": path.resolve(__dirname, "../../packages/client/src"),
+        "@workspace/utils": path.resolve(__dirname, "../../packages/utils/src"),
       },
     },
     module: {

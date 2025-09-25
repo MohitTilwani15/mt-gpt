@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { HistoryIcon, Trash2Icon, MoreVerticalIcon, Share2Icon, ArchiveIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useChats } from '@/hooks/use-chat';
+import { useChats } from '@workspace/client';
 import {
   Sheet,
   SheetContent,
@@ -14,7 +14,7 @@ import {
   SheetTrigger,
 } from '@workspace/ui/components/sheet';
 import { Button } from '@workspace/ui/components/button';
-import { deleteChat as deleteChatApi, updateChatVisibility, archiveChat } from '@/hooks/use-chat';
+import { deleteChat as deleteChatApi, updateChatVisibility, archiveChat } from '@workspace/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover';
 import { Skeleton } from '@workspace/ui/components/skeleton';

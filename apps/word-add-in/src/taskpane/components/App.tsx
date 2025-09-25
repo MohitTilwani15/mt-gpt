@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/componen
 
 import { insertText } from "../taskpane";
 import { Chat } from "./Chat";
+import Chat2 from "./Chat2";
 import Header from "./Header";
 import HeroList from "./HeroList";
 import TextInsertion from "./TextInsertion";
@@ -31,7 +32,8 @@ const App: React.FC<AppProps> = ({ title }) => {
 
         <TabsContent value="chat" className="flex-1 overflow-hidden">
           <div className="h-full">
-            <Chat />
+            {/* <Chat /> */}
+            <Chat2 />
           </div>
         </TabsContent>
 

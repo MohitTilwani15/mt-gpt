@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { LoginForm, SignUpForm } from "@/components/auth/auth-forms";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/auth/auth-client";
 
 export default function LoginPage() {
   const router = useRouter();

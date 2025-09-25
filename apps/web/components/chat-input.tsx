@@ -17,20 +17,17 @@ import {
   PromptInputTools,
 } from '@workspace/ui/components/ui/shadcn-io/ai/prompt-input';
 
-import { SUPPORTED_FILE_TYPES } from '@/lib/utils';
-import type { ChatModel } from '@/hooks/use-models';
-import { StopButton } from "@/components/stop-button";
-import TextInputAttachments from './text-input-attachments';
+import { SUPPORTED_FILE_TYPES } from '@workspace/utils';
+import type { ChatModel } from '@workspace/client';
+import {
+  StopButton,
+  TextInputAttachments,
+  type AttachmentFile,
+} from '@workspace/client/components';
 import { useChat } from '@ai-sdk/react';
-import { useSharedChatContext } from '@/providers/chat-context';
+import { useSharedChatContext } from '@workspace/client/providers';
 
-interface UploadedFile {
-  id: string;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  downloadUrl: string;
-}
+type UploadedFile = AttachmentFile;
 
 interface ChatInputProps {
   text: string;

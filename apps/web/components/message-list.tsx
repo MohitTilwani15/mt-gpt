@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { BotIcon } from 'lucide-react';
 import { Streamdown } from 'streamdown';
-import { useVotes } from '@/hooks/use-votes';
-import type { Vote } from '@/hooks/use-votes';
-import type { MessageDocument } from '@/types/chat';
+import { useVotes } from '@workspace/client';
+import type { Vote } from '@workspace/client';
+import type { MessageDocument } from '@workspace/client/types/chat';
 
 import {
   Message,
@@ -17,19 +18,25 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
-import { useSharedChatContext } from '@/providers/chat-context';
-import { MessageReasoning } from './message-reasoning';
-import { MessageActions } from './message-actions';
-import DocumentAttachments from './document-attachments';
-import DocumentPreview from './document-preview';
+import { useSharedChatContext } from '@workspace/client/providers';
+import { MessageReasoning, MessageActions } from '@workspace/client/components';
+import { DocumentAttachments, DocumentPreview } from '@workspace/client/components';
 
 interface MessageListProps {
   chatId: string;
   onRegenerate?: () => void;
+  enableVoting?: boolean;
+  enableFork?: boolean;
 }
 
 
-export default function MessageList({ chatId, onRegenerate }: MessageListProps) {
+export default function MessageList({
+  chatId,
+  onRegenerate,
+  enableVoting = true,
+  enableFork = true,
+}: MessageListProps) {
+  const router = useRouter();
   const { chat } = useSharedChatContext();
   const { messages, status } = useChat({
     chat,
@@ -138,6 +145,9 @@ export default function MessageList({ chatId, onRegenerate }: MessageListProps) 
                       status={status}
                       onRegenerate={onRegenerate}
                       className="pt-1"
+                      enableVoting={enableVoting}
+                      enableFork={enableFork}
+                      onNavigate={(path) => router.push(path)}
                     />
                   </div>
                 </div>
