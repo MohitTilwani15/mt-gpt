@@ -128,6 +128,23 @@ export class ChatService {
       existingChat && existingChat.title === 'New Chat' && userQueryText.trim(),
     );
 
+    // Start memory retrieval in parallel (non-blocking, can fail gracefully)
+    const memoryPromise = Promise.race([
+      this.mem0MemoryService.getMemoryContext(
+        session.user.id,
+        userQueryText,
+        5,
+      ),
+      // Timeout after 2 seconds to avoid blocking the response
+      new Promise<string>((_, reject) => 
+        setTimeout(() => reject(new Error('Memory retrieval timeout')), 2000)
+      ),
+    ]).catch((err) => {
+      console.warn('Memory retrieval failed or timed out:', err.message);
+      return ''; // Return empty string on failure/timeout
+    });
+
+    // Execute database operations (critical, must succeed)
     const stream = await this.db.transaction(async (transaction) => {
       await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message });
 
@@ -148,16 +165,8 @@ export class ChatService {
         parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
       }));
 
-      let memoryContext = '';
-      try {
-        memoryContext = await this.mem0MemoryService.getMemoryContext(
-          session.user.id,
-          userQueryText,
-          5,
-        );
-      } catch (err) {
-        console.warn('Memory retrieval failed', err);
-      }
+      // Wait for memory retrieval to complete (or timeout/fail)
+      const memoryContext = await memoryPromise;
 
       return this.generateAIResponse({
         chatId: id,
