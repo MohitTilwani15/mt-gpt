@@ -33,6 +33,7 @@ export interface AuthClientLike {
   signUp: {
     email: (input: AuthEmailSignUpInput) => Promise<unknown> | unknown;
   };
+  signOut?: () => Promise<unknown> | unknown;
 }
 
 interface AuthContextValue {

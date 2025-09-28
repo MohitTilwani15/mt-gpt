@@ -18,6 +18,8 @@ import { CloudflareAIGatewayService } from 'src/services/cloudflare-ai-gateway.s
 import { MemoryService } from './services/memory.service';
 import { Mem0MemoryService } from './services/mem0-memory.service';
 import { McpToolService } from './services/mcp-tool.service';
+import { TextProcessingService } from './services/text-processing.service';
+import { AIResponseService } from './services/ai-response.service';
 
 @Module({
   imports: [DatabaseModule, ConfigModule],
@@ -37,6 +39,8 @@ import { McpToolService } from './services/mcp-tool.service';
     MemoryService,
     Mem0MemoryService,
     McpToolService,
+    TextProcessingService,
+    AIResponseService,
   ],
 })
 export class ChatModule {}
