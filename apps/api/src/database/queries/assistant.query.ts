@@ -4,6 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DATABASE_CONNECTION } from '../database-connection';
 import { databaseSchema } from '../schemas';
+import { applyDefaultCache } from '../utils/cache';
 import type { AssistantCapabilities } from '../schemas/assistant.schema';
 
 interface CreateAssistantParams {
@@ -30,6 +31,8 @@ export class AssistantQueryService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
+
+  private readonly cacheTtlSeconds = 60;
 
   async createAssistant(params: CreateAssistantParams) {
     const { ownerId, name, description, instructions, defaultModel, capabilities } = params;
@@ -79,25 +82,47 @@ export class AssistantQueryService {
   }
 
   async getAssistantById(assistantId: string) {
-    const assistant = await this.db.query.assistant.findFirst({
-      where: eq(databaseSchema.assistant.id, assistantId),
-      with: {
-        knowledge: true,
-        shares: true,
-      },
-    });
+    const [assistant] = await applyDefaultCache(
+      this.db
+        .select()
+        .from(databaseSchema.assistant)
+        .where(eq(databaseSchema.assistant.id, assistantId)),
+      `assistant:${assistantId}:base`,
+      this.cacheTtlSeconds,
+    );
 
-    return assistant ?? null;
+    if (!assistant) {
+      return null;
+    }
+
+    const [knowledge, shares] = await Promise.all([
+      applyDefaultCache(
+        this.db
+          .select()
+          .from(databaseSchema.assistantKnowledge)
+          .where(eq(databaseSchema.assistantKnowledge.assistantId, assistantId)),
+        `assistant:${assistantId}:knowledge`,
+        this.cacheTtlSeconds,
+      ),
+      applyDefaultCache(
+        this.db
+          .select()
+          .from(databaseSchema.assistantShare)
+          .where(eq(databaseSchema.assistantShare.assistantId, assistantId)),
+        `assistant:${assistantId}:shares`,
+        this.cacheTtlSeconds,
+      ),
+    ]);
+
+    return {
+      ...assistant,
+      knowledge,
+      shares,
+    };
   }
 
   async getAssistantForUser(assistantId: string, userId: string) {
-    const assistant = await this.db.query.assistant.findFirst({
-      where: eq(databaseSchema.assistant.id, assistantId),
-      with: {
-        knowledge: true,
-        shares: true,
-      },
-    });
+    const assistant = await this.getAssistantById(assistantId);
 
     if (!assistant) {
       return null;
@@ -107,29 +132,45 @@ export class AssistantQueryService {
       return assistant;
     }
 
-    const shared = await this.db.query.assistantShare.findFirst({
-      where: and(
-        eq(databaseSchema.assistantShare.assistantId, assistantId),
-        eq(databaseSchema.assistantShare.userId, userId),
-      ),
-    });
+    const shareMatches = await applyDefaultCache(
+      this.db
+        .select({ share: databaseSchema.assistantShare })
+        .from(databaseSchema.assistantShare)
+        .where(
+          and(
+            eq(databaseSchema.assistantShare.assistantId, assistantId),
+            eq(databaseSchema.assistantShare.userId, userId),
+          ),
+        ),
+      `assistant:${assistantId}:share:${userId}`,
+      this.cacheTtlSeconds,
+    );
 
-    return shared ? assistant : null;
+    return shareMatches.length > 0 ? assistant : null;
   }
 
   async listAssistantsForUser(userId: string) {
-    const owned = await this.db.query.assistant.findMany({
-      where: eq(databaseSchema.assistant.ownerId, userId),
-    });
+    const owned = await applyDefaultCache(
+      this.db
+        .select()
+        .from(databaseSchema.assistant)
+        .where(eq(databaseSchema.assistant.ownerId, userId)),
+      `user:${userId}:assistants:owned`,
+      this.cacheTtlSeconds,
+    );
 
-    const sharedRows = await this.db
-      .select({ assistant: databaseSchema.assistant })
-      .from(databaseSchema.assistantShare)
-      .innerJoin(
-        databaseSchema.assistant,
-        eq(databaseSchema.assistantShare.assistantId, databaseSchema.assistant.id),
-      )
-      .where(eq(databaseSchema.assistantShare.userId, userId));
+    const sharedRows = await applyDefaultCache(
+      this.db
+        .select({ assistant: databaseSchema.assistant })
+        .from(databaseSchema.assistantShare)
+        .innerJoin(
+          databaseSchema.assistant,
+          eq(databaseSchema.assistantShare.assistantId, databaseSchema.assistant.id),
+        )
+        .where(eq(databaseSchema.assistantShare.userId, userId)),
+      `user:${userId}:assistants:shared`,
+      this.cacheTtlSeconds,
+    );
 
     const shared = sharedRows.map((row) => row.assistant);
 
@@ -183,14 +224,21 @@ export class AssistantQueryService {
   }
 
   async listShares(assistantId: string) {
-    const shares = await this.db
-      .select({
-        share: databaseSchema.assistantShare,
-        user: databaseSchema.user,
-      })
-      .from(databaseSchema.assistantShare)
-      .innerJoin(databaseSchema.user, eq(databaseSchema.user.id, databaseSchema.assistantShare.userId))
-      .where(eq(databaseSchema.assistantShare.assistantId, assistantId));
+    const shares = await applyDefaultCache(
+      this.db
+        .select({
+          share: databaseSchema.assistantShare,
+          user: databaseSchema.user,
+        })
+        .from(databaseSchema.assistantShare)
+        .innerJoin(
+          databaseSchema.user,
+          eq(databaseSchema.user.id, databaseSchema.assistantShare.userId),
+        )
+        .where(eq(databaseSchema.assistantShare.assistantId, assistantId)),
+      `assistant:${assistantId}:shares:with-user`,
+      this.cacheTtlSeconds,
+    );
 
     return shares;
   }
