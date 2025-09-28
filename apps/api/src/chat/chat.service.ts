@@ -111,35 +111,32 @@ export class ChatService {
     const stream = await this.db.transaction(async (transaction) => {
       await this.messageQueryService.upsertMessage({ messageId: message.id, chatId: id, message });
 
-      const dbMessages = await transaction.query.message.findMany({
-        where: eq(databaseSchema.message.chatId, id),
-        with: {
-          parts: {
-            orderBy: (parts, { asc }) => [asc(parts.order)],
+      const [dbMessagesResult, memoryContextResult] = await Promise.allSettled([
+        transaction.query.message.findMany({
+          where: eq(databaseSchema.message.chatId, id),
+          with: {
+            parts: {
+              orderBy: (parts, { asc }) => [asc(parts.order)],
+            },
           },
-        },
-        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
-        limit: 4,
-      });
+          orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+          limit: 4,
+        }),
+        this.mem0MemoryService.getMemoryContext(
+          session.user.id,
+          userQueryText,
+          5,
+        )
+      ])
+
+      const dbMessages = dbMessagesResult.status === "fulfilled" ? dbMessagesResult.value : [];
+      const memoryContext = memoryContextResult.status === "fulfilled" ? memoryContextResult.value : null;
 
       const messages = dbMessages.reverse().map((message) => ({
         id: message.id,
         role: message.role,
         parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
       }));
-
-      let memoryContext = '';
-      try {
-        if (this.textProcessingService.isValidTextContent(userQueryText)) {
-          memoryContext = await this.mem0MemoryService.getMemoryContext(
-            session.user.id,
-            userQueryText,
-            5,
-          );
-        }
-      } catch (err) {
-        console.warn('Memory retrieval failed', err);
-      }
 
       let responseStream: any;
 

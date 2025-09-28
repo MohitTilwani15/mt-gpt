@@ -100,7 +100,7 @@ export class AIResponseService {
           system: systemPrompt,
           messages: convertToModelMessages(request.messages),
           stopWhen: stepCountIs(5),
-          experimental_transform: smoothStream({ chunking: 'word' }),
+          experimental_transform: smoothStream({ chunking: 'word', delayInMs: 10 }),
           experimental_telemetry: {
             isEnabled: true,
             functionId: 'chat',

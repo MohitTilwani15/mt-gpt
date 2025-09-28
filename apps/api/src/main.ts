@@ -4,6 +4,8 @@ import { LangfuseExporter } from 'langfuse-vercel';
 import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 import { toNodeHandler } from 'better-auth/node';
 import { AuthService } from '@mguay/nestjs-better-auth';
+import * as compression from 'compression';
+
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -39,6 +41,7 @@ async function bootstrap() {
   // Disable NestJS's built-in body parser so we can control ordering
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
+  app.use(compression());
   app.enableCors({
     origin: [
       'http://localhost:3001', // Local web
