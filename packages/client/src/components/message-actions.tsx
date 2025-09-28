@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useCopyToClipboard } from 'usehooks-ts';
 import { toast } from 'sonner';
 import { UIMessage, ChatStatus } from 'ai';
@@ -210,4 +210,14 @@ export function MessageActions({
   );
 }
 
-export default MessageActions;
+export const MemoizedMessageActions = React.memo<MessageActionsProps>(
+  MessageActions,
+  (prevProps, nextProps) => {
+    return (
+      prevProps.message.id === nextProps.message.id &&
+      prevProps.vote?.isUpvoted === nextProps.vote?.isUpvoted &&
+      prevProps.isLoading === nextProps.isLoading &&
+      prevProps.status === nextProps.status
+    );
+  }
+);

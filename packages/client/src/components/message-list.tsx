@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { BotIcon } from 'lucide-react';
-import { Streamdown } from 'streamdown';
 
 import { useVotes } from '../hooks';
 import type { Vote } from '../hooks';
@@ -18,8 +17,10 @@ import {
   ConversationScrollButton,
 } from '@workspace/ui/components/ui/shadcn-io/ai/conversation';
 import { useSharedChatContext } from '../providers';
+
+import { MemoizedStreamdown } from './memoized-streamdown';
 import { MessageReasoning } from './message-reasoning';
-import { MessageActions } from './message-actions';
+import { MemoizedMessageActions } from './message-actions';
 import { DocumentAttachments } from './document-attachments';
 import { DocumentPreview } from './document-preview';
 
@@ -67,6 +68,18 @@ export function MessageList({
   }, [messages, scrollToBottom]);
 
   const isStreaming = status === 'streaming';
+
+  const streamingAssistantMessageId = useMemo(() => {
+    if (!isStreaming) {
+      return null;
+    }
+
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find((msg) => msg.role === 'assistant');
+
+    return lastAssistantMessage?.id ?? null;
+  }, [isStreaming, messages]);
 
   const handleDocumentPreview = useCallback((document: MessageDocument) => {
     setPreviewDocument(document);
@@ -117,7 +130,7 @@ export function MessageList({
                           }
 
                           if (part.type === 'text' && part.text) {
-                            return <Streamdown key={partKey}>{part.text}</Streamdown>;
+                            return <MemoizedStreamdown key={partKey}>{part.text}</MemoizedStreamdown>;
                           }
 
                           return null;
@@ -129,11 +142,15 @@ export function MessageList({
                   </Message>
 
                   <div className={`flex ${alignmentClass}`}>
-                    <MessageActions
+                    <MemoizedMessageActions
                       chatId={chatId}
                       message={message}
                       vote={vote}
-                      isLoading={isStreaming}
+                      isLoading={
+                        isStreaming &&
+                        streamingAssistantMessageId !== null &&
+                        message.id === streamingAssistantMessageId
+                      }
                       status={status}
                       onRegenerate={onRegenerate}
                       className="pt-1"
