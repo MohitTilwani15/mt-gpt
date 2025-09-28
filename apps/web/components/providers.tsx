@@ -3,7 +3,7 @@
 import * as React from "react"
 import { ThemeProvider } from "next-themes"
 
-import { AuthProvider } from "@workspace/client/providers"
+import { AuthProvider, SWRProvider } from "@workspace/client/providers"
 import { authClient } from "@/auth/auth-client"
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -16,7 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
         enableColorScheme
       >
-        {children}
+        <SWRProvider>
+          {children}
+        </SWRProvider>
       </ThemeProvider>
     </AuthProvider>
   )
