@@ -1,60 +1,18 @@
 import React, { FormEvent, useMemo, useState } from "react";
-import {
-  Button,
-  Field,
-  Input,
-  MessageBar,
-  MessageBarActions,
-  MessageBarBody,
-  MessageBarTitle,
-  Spinner,
-  Tab,
-  TabList,
-  Text,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
+import { Loader2, LogIn, UserPlus } from "lucide-react";
 
-import { authClient } from "../lib/auth-client";
+import { Button } from "@workspace/ui/components/button";
+import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 
-const useStyles = makeStyles({
-  root: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    padding: "24px 16px",
-    borderRadius: tokens.borderRadiusLarge,
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  description: {
-    color: tokens.colorNeutralForeground2,
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-  actionsColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-  buttonContent: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-  },
-  externalButton: {
-    width: "100%",
-  },
-  tabList: {
-    marginBottom: "4px",
-  },
-});
+import { authClient } from "../auth/auth-client";
 
-const useErrorMessage = (error: unknown) => {
+type AuthMode = "signin" | "signup";
+
+type UnknownError = unknown;
+
+const useErrorMessage = (error: UnknownError) => {
   return useMemo(() => {
     if (!error) {
       return null;
@@ -79,8 +37,6 @@ const useErrorMessage = (error: unknown) => {
   }, [error]);
 };
 
-type AuthMode = "signin" | "signup";
-
 const triggerSessionRefresh = () => {
   try {
     authClient.$store.notify("$sessionSignal");
@@ -89,12 +45,42 @@ const triggerSessionRefresh = () => {
   }
 };
 
+const errorPanel = (title: string, message: string, onDismiss?: () => void) => (
+  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p>{message}</p>
+      </div>
+      {onDismiss && (
+        <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={onDismiss}>
+          Dismiss
+        </Button>
+      )}
+    </div>
+  </div>
+);
+
+const fieldWrapper = (
+  id: string,
+  label: string,
+  children: React.ReactNode,
+  helper?: React.ReactNode,
+) => (
+  <div className="space-y-2">
+    <Label htmlFor={id} className="text-sm font-medium text-foreground">
+      {label}
+    </Label>
+    {children}
+    {helper}
+  </div>
+);
+
 const SignInForm: React.FC = () => {
-  const styles = useStyles();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<UnknownError>(null);
   const errorMessage = useErrorMessage(error);
 
   const canSubmit = email.trim().length > 0 && password.trim().length >= 8 && !isSubmitting;
@@ -120,44 +106,40 @@ const SignInForm: React.FC = () => {
   };
 
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
-      {errorMessage && (
-        <MessageBar intent="error" role="alert">
-          <MessageBarBody>
-            <MessageBarTitle>Sign-in failed</MessageBarTitle>
-            {errorMessage}
-          </MessageBarBody>
-          <MessageBarActions>
-            <Button appearance="outline" onClick={() => setError(null)}>
-              Dismiss
-            </Button>
-          </MessageBarActions>
-        </MessageBar>
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      {errorMessage && errorPanel("Sign-in failed", errorMessage, () => setError(null))}
+
+      {fieldWrapper(
+        "signin-email",
+        "Email address",
+        <Input
+          id="signin-email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          required
+        />,
       )}
 
-      <Field label="Email address" required>
+      {fieldWrapper(
+        "signin-password",
+        "Password",
         <Input
-          value={email}
-          onChange={(_event, data) => setEmail(data.value)}
-          type="email"
-          placeholder="you@example.com"
-          required
-        />
-      </Field>
-
-      <Field label="Password" required>
-        <Input
-          value={password}
-          onChange={(_event, data) => setPassword(data.value)}
+          id="signin-password"
           type="password"
+          autoComplete="current-password"
           placeholder="At least 8 characters"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
           required
-        />
-      </Field>
+        />,
+      )}
 
-      <Button appearance="primary" type="submit" disabled={!canSubmit}>
-        <span className={styles.buttonContent}>
-          {isSubmitting && <Spinner size="tiny" />}
+      <Button type="submit" disabled={!canSubmit} className="w-full">
+        <span className="flex items-center justify-center gap-2">
+          {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
           {isSubmitting ? "Signing in" : "Sign in"}
         </span>
       </Button>
@@ -166,12 +148,11 @@ const SignInForm: React.FC = () => {
 };
 
 const SignUpForm: React.FC = () => {
-  const styles = useStyles();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<UnknownError>(null);
   const errorMessage = useErrorMessage(error);
 
   const canSubmit =
@@ -205,54 +186,54 @@ const SignUpForm: React.FC = () => {
   };
 
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
-      {errorMessage && (
-        <MessageBar intent="error" role="alert">
-          <MessageBarBody>
-            <MessageBarTitle>Sign-up failed</MessageBarTitle>
-            {errorMessage}
-          </MessageBarBody>
-          <MessageBarActions>
-            <Button appearance="outline" onClick={() => setError(null)}>
-              Dismiss
-            </Button>
-          </MessageBarActions>
-        </MessageBar>
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      {errorMessage && errorPanel("Sign-up failed", errorMessage, () => setError(null))}
+
+      {fieldWrapper(
+        "signup-name",
+        "Full name",
+        <Input
+          id="signup-name"
+          autoComplete="name"
+          placeholder="Your name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          required
+        />,
       )}
 
-      <Field label="Full name" required>
+      {fieldWrapper(
+        "signup-email",
+        "Email address",
         <Input
-          value={name}
-          onChange={(_event, data) => setName(data.value)}
-          placeholder="Your name"
-          required
-        />
-      </Field>
-
-      <Field label="Email address" required>
-        <Input
-          value={email}
-          onChange={(_event, data) => setEmail(data.value)}
+          id="signup-email"
           type="email"
+          autoComplete="email"
           placeholder="you@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
           required
-        />
-      </Field>
+        />,
+      )}
 
-      <Field label="Password" required>
+      {fieldWrapper(
+        "signup-password",
+        "Password",
         <Input
-          value={password}
-          onChange={(_event, data) => setPassword(data.value)}
+          id="signup-password"
           type="password"
+          autoComplete="new-password"
           placeholder="At least 8 characters"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
           required
-        />
-      </Field>
+        />,
+      )}
 
-      <Button appearance="primary" type="submit" disabled={!canSubmit}>
-        <span className={styles.buttonContent}>
-          {isSubmitting && <Spinner size="tiny" />}
-          {isSubmitting ? "Signing up" : "Create account"}
+      <Button type="submit" disabled={!canSubmit} className="w-full">
+        <span className="flex items-center justify-center gap-2">
+          {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+          {isSubmitting ? "Creating account" : "Create account"}
         </span>
       </Button>
     </form>
@@ -260,27 +241,35 @@ const SignUpForm: React.FC = () => {
 };
 
 export const AuthPanel: React.FC = () => {
-  const styles = useStyles();
   const [mode, setMode] = useState<AuthMode>("signin");
 
   return (
-    <div className={styles.root}>
+    <div className="flex flex-col gap-6 rounded-xl border border-border/60 bg-card p-6 text-card-foreground shadow-sm">
       <div>
-        <Text className={styles.description}>
-          Sign in to connect your account and start chatting.
-        </Text>
+        <h2 className="text-lg font-semibold">Connect your account</h2>
+        <p className="text-sm text-muted-foreground">
+          Sign in to chat with the assistant or create an account to get started.
+        </p>
       </div>
 
-      <TabList
-        selectedValue={mode}
-        onTabSelect={(_event, data) => setMode(data.value as AuthMode)}
-        className={styles.tabList}
-      >
-        <Tab value="signin">Sign in</Tab>
-        <Tab value="signup">Sign up</Tab>
-      </TabList>
+      <Tabs value={mode} onValueChange={(value) => setMode(value as AuthMode)} className="space-y-4">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="signin" className="flex-1">
+            Sign in
+          </TabsTrigger>
+          <TabsTrigger value="signup" className="flex-1">
+            Sign up
+          </TabsTrigger>
+        </TabsList>
 
-      {mode === "signin" ? <SignInForm /> : <SignUpForm />}
+        <TabsContent value="signin">
+          <SignInForm />
+        </TabsContent>
+
+        <TabsContent value="signup">
+          <SignUpForm />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -4,7 +4,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@workspace/ui/*": ["../../packages/ui/src/*"]
+      "@workspace/ui/*": ["../../packages/ui/src/*"],
+      "@workspace/client/*": ["../../packages/client/src/*"],
+      "@workspace/client": ["../../packages/client/src/index.ts"],
+      "@workspace/utils": ["../../packages/utils/src/index.ts"],
+      "@workspace/utils/*": ["../../packages/utils/src/*"]
     },
     "plugins": [
       {

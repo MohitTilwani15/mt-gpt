@@ -13,17 +13,14 @@ import { UIMessage } from "ai";
 import { AIDevtools } from "ai-sdk-devtools";
 import { useRouter, useParams } from "next/navigation";
 
-import ErrorBoundary from "@/components/error-boundary";
-import ChatHeader from "@/components/chat-header";
-import MessageList from "@/components/message-list";
-import ChatInput from "@/components/chat-input";
-import { useSelectedModel, useFileUpload } from "@/hooks/index";
+import { ErrorBoundary, ChatHeader, MessageList, ChatInput } from "@workspace/client/components";
+import { useSelectedModel, useFileUpload } from "@workspace/client";
 import { Button } from "@workspace/ui/components/button";
-import { useSharedChatContext } from "@/providers/chat-context";
-import { useChat as useChatDetails } from "@/hooks/use-chat";
+import { useSharedChatContext } from "@workspace/client/providers";
+import { useChat as useChatDetails } from "@workspace/client";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Switch } from "@workspace/ui/components/switch";
-import { resolveApiUrl } from "@/lib/http";
+import { resolveApiUrl } from "@workspace/client/lib/http"; // fix this
 
 interface UploadedFile {
   id: string;
@@ -277,6 +274,7 @@ export default function ChatPage() {
         <MessageList
           chatId={chatId}
           onRegenerate={handleRegenerate}
+          onNavigate={(path) => router.push(path)}
         />
 
         <ChatInput

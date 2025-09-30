@@ -1,334 +1,102 @@
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
-import { Chat as ChatClient, useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, UIMessage } from "ai";
-import { v4 as uuidv4 } from "uuid";
+import { useChat } from "@ai-sdk/react";
+import { UIMessage } from "ai";
 import {
-  Button,
-  Dropdown,
-  Field,
-  MessageBar,
-  MessageBarBody,
-  MessageBarTitle,
-  MessageBarActions,
-  Option,
-  Spinner,
-  Textarea,
-  Text,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
-import { authClient } from "../lib/auth-client";
-import { AuthPanel } from "./AuthPanel";
-import { getApiUrl } from "../utils/api";
+  Loader2,
+  LogOut,
+  MessageSquare,
+  PlusCircle,
+  Send,
+  StopCircle,
+} from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 
-interface ChatModel {
-  id: string;
-  name: string;
-  supportsReasoning?: boolean;
-}
+import { Button } from "@workspace/ui/components/button";
+import { Label } from "@workspace/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import { ScrollArea } from "@workspace/ui/components/scroll-area";
+import { Textarea } from "@workspace/ui/components/textarea";
+import {
+  ChatContextSnapshot,
+  ChatModel,
+  createChat,
+  createChatClient,
+  fetchChatModels,
+} from "@workspace/client";
+
+import { authClient } from "../auth/auth-client";
+import { AuthPanel } from "./AuthPanel";
 
 const LOCAL_STORAGE_KEY = "word-addin-selected-chat-model";
 
-const useStyles = makeStyles({
-  root: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    padding: "16px",
-    height: "100%",
-    boxSizing: "border-box",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-  headerInfo: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-  },
-  signedInAs: {
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase200,
-  },
-  messages: {
-    flex: 1,
-    minHeight: 0,
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    padding: "12px",
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  messageBubble: {
-    padding: "12px 14px",
-    borderRadius: tokens.borderRadiusLarge,
-    maxWidth: "85%",
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-    boxShadow: tokens.shadow4,
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-  },
-  userMessage: {
-    alignSelf: "flex-end",
-    backgroundColor: tokens.colorBrandBackground,
-    color: tokens.colorNeutralForegroundOnBrand,
-  },
-  assistantMessage: {
-    alignSelf: "flex-start",
-    backgroundColor: tokens.colorNeutralBackground3,
-    color: tokens.colorNeutralForeground1,
-  },
-  messageRole: {
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightSemibold,
-  },
-  messageText: {
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase300,
-  },
-  reasoning: {
-    padding: "10px",
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground1,
-    border: `1px solid ${tokens.colorPaletteBlueBorderActive}`,
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase300,
-  },
-  fileLink: {
-    color: tokens.colorBrandForegroundLink,
-    textDecoration: "none",
-    wordBreak: "break-word",
-  },
-  placeholder: {
-    textAlign: "center",
-    color: tokens.colorNeutralForeground3,
-    padding: "48px 0",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inputSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    padding: "12px",
-    backgroundColor: tokens.colorNeutralBackground2,
-  },
-  actionsRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-  actionsSpacer: {
-    flex: 1,
-  },
-  statusText: {
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase200,
-  },
-  spinner: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  authWrapper: {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  authCard: {
-    width: "100%",
-    maxWidth: "420px",
-  },
-  loadingState: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "12px",
-    color: tokens.colorNeutralForeground3,
-  },
-});
+const createErrorBanner = (message: string, onDismiss?: () => void) => (
+  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="font-semibold">Something went wrong</p>
+        <p>{message}</p>
+      </div>
+      {onDismiss && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          onClick={onDismiss}
+        >
+          Dismiss
+        </Button>
+      )}
+    </div>
+  </div>
+);
+
+const resolveStoredModel = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.localStorage.getItem(LOCAL_STORAGE_KEY) || "";
+};
 
 export const Chat: React.FC = () => {
-  const styles = useStyles();
-  const { data: session, isPending: isSessionLoading, error: sessionError } = authClient.useSession();
-  const [chatId, setChatId] = useState(() => uuidv4());
+  const {
+    data: session,
+    isPending: isSessionLoading,
+    error: sessionError,
+  } = authClient.useSession();
+
+  const [chatId, setChatId] = useState<string>(() => uuidv4());
   const [models, setModels] = useState<ChatModel[]>([]);
-  const [defaultModel, setDefaultModel] = useState<string>("");
-  const [selectedModel, setSelectedModelState] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return window.localStorage.getItem(LOCAL_STORAGE_KEY) || "";
-    }
-    return "";
-  });
+  const [selectedModel, setSelectedModel] = useState<string>(() => resolveStoredModel());
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [isInitializingChat, setIsInitializingChat] = useState(false);
 
-  const chatIdRef = useRef(chatId);
+  const chatContextRef = useRef<ChatContextSnapshot>({
+    chatId,
+    selectedModel: selectedModel || undefined,
+  });
   const selectedModelRef = useRef(selectedModel);
+  const chatIdRef = useRef(chatId);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const previousSessionRef = useRef<typeof session>(session);
 
-  const updateSelectedModel = useCallback((modelId: string) => {
-    setSelectedModelState(modelId);
-    selectedModelRef.current = modelId;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(LOCAL_STORAGE_KEY, modelId);
-    }
-  }, []);
-
-  useEffect(() => {
-    selectedModelRef.current = selectedModel;
-  }, [selectedModel]);
-
-  useEffect(() => {
-    chatIdRef.current = chatId;
-  }, [chatId]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    const loadModels = async () => {
-      setIsLoadingModels(true);
-      try {
-        const response = await fetch(getApiUrl("/api/chat/models"), {
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error("You need to sign in to load models.");
-          }
-          throw new Error("Failed to load supported models");
-        }
-
-        const data: { models: ChatModel[]; defaultModel: string } = await response.json();
-
-        if (!isActive) {
-          return;
-        }
-
-        setModels(data.models);
-        setDefaultModel(data.defaultModel);
-
-        const hasExistingSelection =
-          selectedModelRef.current && data.models.some((model) => model.id === selectedModelRef.current);
-
-        if (hasExistingSelection) {
-          updateSelectedModel(selectedModelRef.current);
-        } else if (data.models.length > 0) {
-          const fallbackModel = data.models.find((model) => model.id === data.defaultModel) || data.models[0];
-          updateSelectedModel(fallbackModel.id);
-        }
-      } catch (err) {
-        console.error("Error loading chat models:", err);
-        if (isActive) {
-          setError(err instanceof Error ? err.message : "We could not load available models. Please try again later.");
-        }
-      } finally {
-        if (isActive) {
-          setIsLoadingModels(false);
-        }
-      }
-    };
-
-    if (!session) {
-      setModels([]);
-      setIsLoadingModels(false);
-    } else {
-      loadModels();
-    }
-
-    return () => {
-      isActive = false;
-    };
-  }, [session, updateSelectedModel]);
-
-  const initializeChat = useCallback(async (id: string) => {
-    if (!session) {
-      return;
-    }
-
-    setIsInitializingChat(true);
-    try {
-      const response = await fetch(getApiUrl("/api/chat/create"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ id }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Your session expired. Please sign in again.");
-        }
-        const message = await response.text();
-        throw new Error(message || "Failed to initialize chat");
-      }
-
-      setError(null);
-    } catch (err) {
-      console.error("Error initializing chat:", err);
-      setError(err instanceof Error ? err.message : "We couldn't start a new chat session. Please try again.");
-    } finally {
-      setIsInitializingChat(false);
-    }
-  }, [session]);
-
-  useEffect(() => {
-    if (!session) {
-      return;
-    }
-    initializeChat(chatIdRef.current);
-  }, [chatId, initializeChat, session]);
-
-  const chatClientRef = useRef<ChatClient<UIMessage> | null>(null);
-
-  if (!chatClientRef.current) {
-    chatClientRef.current = new ChatClient<UIMessage>({
-      generateId: () => uuidv4(),
-      transport: new DefaultChatTransport({
-        api: getApiUrl("/api/chat"),
-        credentials: "include",
-        prepareSendMessagesRequest: ({ messages }) => {
-          const lastMessage = messages[messages.length - 1];
-          return {
-            body: {
-              id: chatIdRef.current,
-              selectedChatModel: selectedModelRef.current,
-              message: lastMessage,
-            },
-          };
-        },
-      }),
-    });
-  }
-
-  const chatInstance = chatClientRef.current;
+  const chatClientRef = useRef(createChatClient({
+    getContext: () => chatContextRef.current,
+  }));
 
   const {
     messages,
@@ -338,7 +106,124 @@ export const Chat: React.FC = () => {
     setMessages,
     error: chatError,
     clearError: clearChatError,
-  } = useChat({ chat: chatInstance });
+  } = useChat({ chat: chatClientRef.current });
+
+  useEffect(() => {
+    chatIdRef.current = chatId;
+    chatContextRef.current.chatId = chatId;
+  }, [chatId]);
+
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+    chatContextRef.current.selectedModel = selectedModel || undefined;
+  }, [selectedModel]);
+
+  const updateSelectedModel = useCallback((modelId: string) => {
+    setSelectedModel(modelId);
+    selectedModelRef.current = modelId;
+    chatContextRef.current.selectedModel = modelId || undefined;
+    if (typeof window !== "undefined") {
+      if (modelId) {
+        window.localStorage.setItem(LOCAL_STORAGE_KEY, modelId);
+      } else {
+        window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadModels = async () => {
+      if (!session) {
+        setModels([]);
+        updateSelectedModel("");
+        setIsLoadingModels(false);
+        return;
+      }
+
+      setIsLoadingModels(true);
+
+      try {
+        const data = await fetchChatModels();
+        if (!isActive) {
+          return;
+        }
+
+        setModels(data.models);
+
+        if (data.models.length === 0) {
+          updateSelectedModel("");
+          return;
+        }
+
+        const storedModel = selectedModelRef.current;
+        const storedModelExists = storedModel
+          ? data.models.some((model) => model.id === storedModel)
+          : false;
+
+        if (storedModelExists) {
+          updateSelectedModel(storedModel);
+        } else {
+          const fallback = data.models.find((model) => model.id === data.defaultModel) || data.models[0];
+          updateSelectedModel(fallback.id);
+        }
+      } catch (err) {
+        console.error("Error loading chat models", err);
+        if (isActive) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "We couldn't load available models. Please try again later.",
+          );
+          setModels([]);
+          updateSelectedModel("");
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingModels(false);
+        }
+      }
+    };
+
+    loadModels();
+
+    return () => {
+      isActive = false;
+    };
+  }, [session, updateSelectedModel]);
+
+  const initializeChat = useCallback(
+    async (id: string) => {
+      if (!session) {
+        return;
+      }
+
+      setIsInitializingChat(true);
+      try {
+        await createChat({ id });
+        setError(null);
+      } catch (err) {
+        console.error("Error initializing chat", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "We couldn't start a new chat session. Please try again.",
+        );
+      } finally {
+        setIsInitializingChat(false);
+      }
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    initializeChat(chatIdRef.current);
+  }, [chatId, initializeChat, session]);
 
   useEffect(() => {
     if (chatError) {
@@ -360,26 +245,28 @@ export const Chat: React.FC = () => {
       setInput("");
       setMessages([]);
       setModels([]);
-      setSelectedModelState("");
-      selectedModelRef.current = "";
+      updateSelectedModel("");
       setError(null);
       const newChatId = uuidv4();
       setChatId(newChatId);
     }
     previousSessionRef.current = session;
-  }, [session, stop, setMessages, setModels, setChatId, setSelectedModelState]);
+  }, [session, stop, setMessages, updateSelectedModel]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const canSend =
-    input.trim().length > 0 &&
-    status === "ready" &&
-    !isInitializingChat &&
-    !isLoadingModels &&
-    Boolean(selectedModelRef.current) &&
-    Boolean(session);
+  const canSend = useMemo(() => {
+    return (
+      input.trim().length > 0 &&
+      status === "ready" &&
+      !isInitializingChat &&
+      !isLoadingModels &&
+      Boolean(selectedModelRef.current) &&
+      Boolean(session)
+    );
+  }, [input, status, isInitializingChat, isLoadingModels, session]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -400,7 +287,7 @@ export const Chat: React.FC = () => {
       await sendMessage({ text: trimmed });
       setInput("");
     } catch (err) {
-      console.error("Error sending message:", err);
+      console.error("Error sending message", err);
       setError("Your message could not be sent. Please try again.");
     }
   };
@@ -409,9 +296,11 @@ export const Chat: React.FC = () => {
     if (!session) {
       return;
     }
+
     clearChatError?.();
     setError(null);
     setMessages([]);
+    setInput("");
     const newChatId = uuidv4();
     setChatId(newChatId);
   };
@@ -421,7 +310,7 @@ export const Chat: React.FC = () => {
       stop?.();
       await authClient.signOut();
     } catch (err) {
-      console.error("Error signing out:", err);
+      console.error("Error signing out", err);
       setError("We couldn't sign you out. Please try again.");
     }
   };
@@ -431,187 +320,221 @@ export const Chat: React.FC = () => {
     setError(null);
   };
 
-  const renderMessageContent = (message: UIMessage) => {
-    return message.parts.map((part, index) => {
-      if (part.type === "text") {
-        return (
-          <span key={`${message.id}-text-${index}`} className={styles.messageText}>
-            {part.text}
-          </span>
-        );
-      }
+  const renderMessagePart = (message: UIMessage, index: number) => {
+    const part = message.parts[index];
 
-      if (part.type === "reasoning" && typeof part.text === "string") {
-        return (
-          <div key={`${message.id}-reasoning-${index}`} className={styles.reasoning}>
-            {part.text}
-          </div>
-        );
-      }
+    if (!part) {
+      return null;
+    }
 
-      if (part.type === "file") {
-        const filename = (part as { filename?: string }).filename;
-        const url = (part as { url?: string }).url;
-        if (url) {
+    switch (part.type) {
+      case "text":
+        return (
+          <p key={`${message.id}-text-${index}`} className="whitespace-pre-wrap text-sm leading-6">
+            {part.text}
+          </p>
+        );
+      case "reasoning":
+        if (typeof part.text === "string" && part.text.trim().length > 0) {
+          return (
+            <div
+              key={`${message.id}-reasoning-${index}`}
+              className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm"
+            >
+              {part.text}
+            </div>
+          );
+        }
+        return null;
+      case "file": {
+        const filePart = part as { filename?: string; url?: string };
+        if (filePart.url) {
           return (
             <a
               key={`${message.id}-file-${index}`}
-              href={url}
-              className={styles.fileLink}
+              href={filePart.url}
               target="_blank"
               rel="noreferrer"
+              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
             >
-              {filename || "View attached file"}
+              {filePart.filename || "View attached file"}
             </a>
           );
         }
+        return null;
       }
-
-      return (
-        <span key={`${message.id}-unknown-${index}`} className={styles.messageText}>
-          {part.type}
-        </span>
-      );
-    });
+      default:
+        return (
+          <></>
+        );
+    }
   };
 
   const streaming = status === "streaming";
-  const errorBar = error ? (
-    <MessageBar intent="error" role="alert">
-      <MessageBarBody>
-        <MessageBarTitle>Something went wrong</MessageBarTitle>
-        {error}
-      </MessageBarBody>
-      <MessageBarActions>
-        <Button appearance="outline" onClick={dismissError}>
-          Dismiss
-        </Button>
-      </MessageBarActions>
-    </MessageBar>
-  ) : null;
+  const statusMessage = streaming
+    ? "The assistant is responding..."
+    : status === "submitted"
+    ? "Sending your message..."
+    : isInitializingChat
+    ? "Preparing chat..."
+    : "";
 
   if (isSessionLoading) {
     return (
-      <div className={styles.root}>
-        <div className={styles.authWrapper}>
-          <div className={styles.loadingState}>
-            <Spinner size="medium" />
-            <Text>Checking your account...</Text>
-          </div>
-        </div>
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+        <p>Checking your account...</p>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className={styles.root}>
-        <div className={styles.authWrapper}>
-          <div className={styles.authCard}>
-            {errorBar}
-            <AuthPanel />
-          </div>
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="w-full max-w-lg">
+          {error && createErrorBanner(error, dismissError)}
+          <AuthPanel />
         </div>
       </div>
     );
   }
 
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <div className={styles.headerInfo}>
-          <Text size={400} weight="semibold">
-            Chat Assistant
-          </Text>
+    <div className="flex h-full flex-col gap-4 px-4 pb-4">
+      <header className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card px-4 py-4 text-card-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-lg font-semibold">Chat Assistant</h1>
           {session?.user?.email && (
-            <Text className={styles.signedInAs}>Signed in as {session.user.email}</Text>
+            <p className="text-sm text-muted-foreground">Signed in as {session.user.email}</p>
           )}
         </div>
-        <div className={styles.actionsRow}>
-          <Button onClick={handleSignOut} appearance="secondary">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={handleSignOut}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="size-4" />
             Sign out
           </Button>
-          <Button onClick={handleNewChat} appearance="primary" disabled={streaming || isInitializingChat}>
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={handleNewChat}
+            disabled={streaming || isInitializingChat}
+            className="flex items-center gap-2"
+          >
+            <PlusCircle className="size-4" />
             New conversation
           </Button>
           {(streaming || isInitializingChat) && (
-            <div className={styles.spinner}>
-              <Spinner size="tiny" labelPosition="after" label={streaming ? "Generating response" : "Preparing chat"} />
-            </div>
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              {streaming ? "Generating response" : "Preparing chat"}
+            </span>
           )}
         </div>
-      </div>
+      </header>
 
-      {errorBar}
+      {error && createErrorBanner(error, dismissError)}
 
-      <div className={styles.messages}>
+      <ScrollArea className="flex-1 rounded-2xl border border-border/60 bg-muted/20 p-4">
         {messages.length === 0 ? (
-          <div className={styles.placeholder}>
-            <Text weight="semibold">Start a new conversation</Text>
-            <Text>Send a prompt below to begin chatting with the assistant.</Text>
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <MessageSquare className="size-5" />
+            </div>
+            <div>
+              <p className="text-base font-medium text-foreground">Start a new conversation</p>
+              <p className="text-sm text-muted-foreground">
+                Send a prompt below to begin chatting with the assistant.
+              </p>
+            </div>
           </div>
         ) : (
-          messages.map((message) => {
-            const isUser = message.role === "user";
-            const bubbleStyles = [styles.messageBubble, isUser ? styles.userMessage : styles.assistantMessage];
-
-            return (
-              <div key={message.id} className={bubbleStyles.join(" ")}>
-                <span className={styles.messageRole}>{isUser ? "You" : "Assistant"}</span>
-                {renderMessageContent(message)}
-              </div>
-            );
-          })
+          <div className="space-y-4">
+            {messages.map((message) => {
+              const isUser = message.role === "user";
+              return (
+                <div
+                  key={message.id}
+                  className={`max-w-[85%] rounded-2xl border px-4 py-3 shadow-sm ${
+                    isUser
+                      ? "ml-auto border-primary/20 bg-primary text-primary-foreground"
+                      : "border-border/60 bg-card text-card-foreground"
+                  }`}
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {isUser ? "You" : "Assistant"}
+                  </span>
+                  <div className="mt-2 space-y-3">
+                    {message.parts.map((_part, index) => renderMessagePart(message, index))}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
+      </ScrollArea>
 
-      <form className={styles.inputSection} onSubmit={handleSubmit}>
-        <Field label="Model">
-          <Dropdown
-            placeholder={isLoadingModels ? "Loading models..." : "Select a model"}
-            selectedOptions={selectedModel ? [selectedModel] : []}
-            onOptionSelect={(_event, data) => {
-              if (data.optionValue) {
-                updateSelectedModel(data.optionValue);
-              }
-            }}
-            disabled={isLoadingModels || streaming || isInitializingChat || models.length === 0}
-          >
-            {models.map((model) => (
-              <Option key={model.id} value={model.id}>
-                {model.name}
-              </Option>
-            ))}
-          </Dropdown>
-        </Field>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="model-select">Model</Label>
+            <Select
+              value={selectedModel || ""}
+              onValueChange={(value) => updateSelectedModel(value)}
+              disabled={isLoadingModels || streaming || isInitializingChat || models.length === 0}
+            >
+              <SelectTrigger id="model-select">
+                <SelectValue placeholder={isLoadingModels ? "Loading models..." : "Select a model"} />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {models.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!isLoadingModels && models.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No models are available for your account. Please check your API configuration.
+              </p>
+            )}
+          </div>
+        </div>
 
-        <Field label="Message">
+        <div className="space-y-2">
+          <Label htmlFor="chat-input">Message</Label>
           <Textarea
+            id="chat-input"
             value={input}
-            onChange={(_event, data) => setInput(data.value)}
+            onChange={(event) => setInput(event.target.value)}
             placeholder={isInitializingChat ? "Preparing chat..." : "Ask the assistant anything"}
             disabled={isInitializingChat || isLoadingModels}
             rows={4}
+            className="resize-none"
           />
-        </Field>
+        </div>
 
-        <div className={styles.actionsRow}>
-          <div className={styles.actionsSpacer}>
-            <Text className={styles.statusText}>
-              {streaming
-                ? "The assistant is responding..."
-                : status === "submitted"
-                ? "Sending your message..."
-                : ""}
-            </Text>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex-1 text-sm text-muted-foreground">{statusMessage}</span>
           {streaming && (
-            <Button type="button" appearance="secondary" onClick={() => stop?.()}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => stop?.()}
+              className="flex items-center gap-2"
+            >
+              <StopCircle className="size-4" />
               Stop generating
             </Button>
           )}
-          <Button appearance="primary" type="submit" disabled={!canSend}>
+          <Button type="submit" disabled={!canSend} className="flex items-center gap-2">
+            <Send className="size-4" />
             Send message
           </Button>
         </div>
