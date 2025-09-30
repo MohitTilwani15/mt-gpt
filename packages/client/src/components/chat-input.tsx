@@ -27,7 +27,7 @@ import {
 } from './text-input-attachments';
 import { useSharedChatContext } from '../providers';
 
-export type UploadedFile = AttachmentFile;
+export type ChatInputUploadedFile = AttachmentFile;
 
 export interface ChatInputProps {
   text: string;
@@ -35,7 +35,7 @@ export interface ChatInputProps {
   model: string;
   setModel: (model: string) => void;
   models: readonly ChatModel[];
-  uploadedFiles: UploadedFile[];
+  uploadedFiles: ChatInputUploadedFile[];
   onFileUpload: (files: FileList) => Promise<void>;
   onRemoveFile: (fileId: string) => void;
   onSubmit: FormEventHandler<HTMLFormElement>;
