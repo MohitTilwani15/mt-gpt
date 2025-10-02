@@ -97,6 +97,9 @@ importers:
       drizzle-orm:
         specifier: ^0.44.5
         version: 0.44.5(@cloudflare/workers-types@4.20250913.0)(@neondatabase/serverless@1.0.1)(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(@upstash/redis@1.35.4)(kysely@0.28.5)(pg@8.16.3)(sqlite3@5.1.7)
+      express:
+        specifier: ^5.1.0
+        version: 5.1.0
       langfuse-vercel:
         specifier: ^3.38.5
         version: 3.38.5(ai@5.0.40(zod@4.1.8))
