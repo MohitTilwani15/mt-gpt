@@ -26,6 +26,21 @@ import type { AssistantCapabilities } from 'src/database/schemas/assistant.schem
 import { TextProcessingService } from './services/text-processing.service';
 import { AIResponseService } from './services/ai-response.service';
 
+type ChatSearchMatchType = 'message' | 'title';
+
+export interface ChatSearchMatch {
+  type: ChatSearchMatchType;
+  snippet: string | null;
+}
+
+export interface ChatSearchResult {
+  chatId: string;
+  title: string | null;
+  createdAt: Date;
+  snippet: string | null;
+  matches: ChatSearchMatch[];
+}
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -319,8 +334,58 @@ export class ChatService {
     return forkedChat;
   }
 
-  async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }) {
-    return this.messageQueryService.searchChatsByMessageTerm(params);
+  async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }): Promise<ChatSearchResult[]> {
+    const { userId, term, limit = 10 } = params;
+
+    const normalizeSnippet = (value?: string | null) => {
+      if (!value) {
+        return null;
+      }
+      const trimmed = value.trim();
+      return trimmed.length > 280 ? `${trimmed.slice(0, 277)}…` : trimmed;
+    };
+
+    const expandedLimit = Math.max(limit, 10);
+
+    const [messageMatches, titleMatches] = await Promise.all([
+      this.messageQueryService.searchChatsByMessageTerm({ userId, term, limit: expandedLimit }),
+      this.chatQueryService.searchChatsByTitle({ userId, term, limit: expandedLimit }),
+    ]);
+
+    const resultsMap = new Map<string, ChatSearchResult>();
+
+    const register = (
+      row: { chatId: string; title: string | null; createdAt: Date; snippet: string | null },
+      matchType: ChatSearchMatchType,
+    ) => {
+      const snippet = normalizeSnippet(row.snippet);
+      const existing = resultsMap.get(row.chatId);
+
+      if (existing) {
+        existing.matches.push({ type: matchType, snippet });
+        if (!existing.snippet && snippet) {
+          existing.snippet = snippet;
+        }
+        return;
+      }
+
+      resultsMap.set(row.chatId, {
+        chatId: row.chatId,
+        title: row.title,
+        createdAt: row.createdAt,
+        snippet,
+        matches: [{ type: matchType, snippet }],
+      });
+    };
+
+    messageMatches.forEach((row) => register(row, 'message'));
+    titleMatches.forEach((row) => register(row, 'title'));
+
+    const ordered = Array.from(resultsMap.values()).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+
+    return ordered.slice(0, limit);
   }
 
   async deleteChatById(chatId: string, session: UserSession) {

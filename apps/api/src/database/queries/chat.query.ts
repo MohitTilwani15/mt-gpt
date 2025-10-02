@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, desc, eq, gt, lt, SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, SQL, sql } from 'drizzle-orm';
 import { LanguageModelV2Usage } from '@ai-sdk/provider';
 
 import { ChatSDKError } from "../../lib/errors";
@@ -203,5 +203,41 @@ export class ChatQueryService {
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to assign assistant to chat');
     }
+  }
+
+  async searchChatsByTitle({
+    userId,
+    term,
+    limit = 10,
+  }: {
+    userId: string;
+    term: string;
+    limit?: number;
+  }) {
+    const likeValue = `%${term.toLowerCase()}%`;
+
+    const rows = await this.db
+      .select({
+        chatId: chat.id,
+        title: chat.title,
+        createdAt: chat.createdAt,
+      })
+      .from(chat)
+      .where(
+        and(
+          eq(chat.userId, userId),
+          eq(chat.isArchived, false),
+          sql`LOWER(${chat.title}) LIKE ${likeValue}`,
+        ),
+      )
+      .orderBy(desc(chat.createdAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      chatId: row.chatId,
+      title: row.title,
+      createdAt: row.createdAt,
+      snippet: row.title,
+    }));
   }
 }

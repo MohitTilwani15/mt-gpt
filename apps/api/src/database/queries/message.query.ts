@@ -118,6 +118,7 @@ export class MessageQueryService {
       .where(
         and(
           eq(chat.userId, userId),
+          eq(chat.isArchived, false),
           eq(databaseSchema.parts.type, 'text'),
           sql`LOWER(${databaseSchema.parts.text_text}) LIKE ${likeValue}`,
         ),
