@@ -1,0 +1,49 @@
+name: Trigger auto deployment for legaltech-api
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ main ]
+    paths:
+    - '**'
+    - '.github/workflows/legaltech-api-AutoDeployTrigger-3d45da64-3bf5-427a-a4d2-ba8161ef2a9e.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.LEGALTECHAPI_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.LEGALTECHAPI_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.LEGALTECHAPI_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          _targetLabelKey_: _targetLabel_
+          registryUrl: legaltechbackend-byh6hsarbjekf7bc.azurecr.io
+          registryUsername: ${{ secrets.LEGALTECHAPI_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.LEGALTECHAPI_REGISTRY_PASSWORD }}
+          containerAppName: legaltech-api
+          resourceGroup: legaltech
+          imageToBuild: legaltechbackend-byh6hsarbjekf7bc.azurecr.io/legaltech-api:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
