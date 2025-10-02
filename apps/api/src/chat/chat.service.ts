@@ -181,20 +181,24 @@ export class ChatService {
                 this.textProcessingService.isValidTextContent(userTextFull) &&
                 this.textProcessingService.isValidTextContent(aiResponseText)
               ) {
-                await this.mem0MemoryService.addMemory({
-                  userId: session.user.id,
-                  chatId: id,
-                  messageId: message.id,
-                  messages: [
-                    { role: 'user', content: userTextFull },
-                    { role: 'assistant', content: aiResponseText },
-                  ],
-                  metadata: {
+                void this.mem0MemoryService
+                  .addMemory({
+                    userId: session.user.id,
                     chatId: id,
                     messageId: message.id,
-                    responseMessageId: responseMessage.id,
-                  },
-                });
+                    messages: [
+                      { role: 'user', content: userTextFull },
+                      { role: 'assistant', content: aiResponseText },
+                    ],
+                    metadata: {
+                      chatId: id,
+                      messageId: message.id,
+                      responseMessageId: responseMessage.id,
+                    },
+                  })
+                  .catch((error) => {
+                    console.warn('Conversation memory write failed', error);
+                  });
               }
             } catch (err) {
               console.warn('Conversation memory write failed', err);
