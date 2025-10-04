@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, Post } from '@nestjs/common';
 
 import { EmailAssistantService, PubSubPushBody } from './email-assistant.service';
 
@@ -7,6 +7,7 @@ export class EmailAssistantController {
   constructor(private readonly emailAssistantService: EmailAssistantService) {}
 
   @Post('email-assistant')
+  @HttpCode(200)
   async handlePubSubPush(
     @Body() body: PubSubPushBody,
     @Headers('authorization') authorization?: string,
