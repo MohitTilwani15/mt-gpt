@@ -50,7 +50,10 @@ export class AppController {
       });
   
       const messages = historyRes.data.history?.flatMap(h => h.messagesAdded ?? []);
-      if (!messages?.length) return { status: 'no_new_messages' };
+      if (!messages?.length) {
+        console.log('No new messages found in history.');
+        return { status: 'no_new_messages' };
+      }
 
       const messageId = messages[0].message.id;
 
@@ -59,6 +62,8 @@ export class AppController {
         id: messageId,
         format: 'full',
       });
+
+      console.log('Fetched message:', stringifyBody(msg));
   
       return { status: 'received', email: msg };
     } catch (error) {
