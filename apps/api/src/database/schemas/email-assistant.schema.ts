@@ -6,7 +6,7 @@ export const gmailSyncState = pgTable('gmail_sync_state', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-export const emailMessages = pgTable('gmail_messages', {
+export const emailMessages = pgTable('email_messages', {
   id: text('id').primaryKey(),
   threadId: text('thread_id'),
   fromEmail: text('from_email'),
@@ -19,7 +19,7 @@ export const emailMessages = pgTable('gmail_messages', {
   direction: text('direction'),
 });
 
-export const emailAttachments = pgTable('gmail_attachments', {
+export const emailAttachments = pgTable('email_attachments', {
   id: serial('id').primaryKey(),
   messageId: text('message_id')
     .references(() => emailMessages.id)
