@@ -44,6 +44,8 @@
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.5",
     "express": "^5.1.0",
+    "google-auth-library": "^10.4.0",
+    "googleapis": "^161.0.0",
     "langfuse-vercel": "^3.38.5",
     "linkup-sdk": "^2.0.0",
     "mammoth": "^1.10.0",
