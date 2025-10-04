@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { Body, Controller, Post } from '@nestjs/common';
-import { google } from 'googleapis';
+import { gmail } from '@googleapis/gmail';
 import { JWT } from 'google-auth-library';
 
 const stringifyBody = (value: unknown): string => {
@@ -37,9 +37,9 @@ export class AppController {
         subject: 'mohit@alphalink.xyz',
       });
   
-      const gmail = google.gmail({ version: 'v1', auth: jwtClient });
+      const gmailInstance = gmail({ version: 'v1', auth: jwtClient });
   
-      const res = await gmail.users.watch({
+      const res = await gmailInstance.users.watch({
         userId: 'me',
         requestBody: {
           labelIds: ['INBOX'],

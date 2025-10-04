@@ -43,6 +43,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.887.0
         version: 3.887.0
+      '@googleapis/gmail':
+        specifier: ^15.0.0
+        version: 15.0.0
       '@mguay/nestjs-better-auth':
         specifier: ^1.0.4
         version: 1.0.4(@nestjs/common@11.1.6(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(better-auth@1.3.9(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(express@5.1.0)(typescript@5.9.2)
@@ -103,9 +106,6 @@ importers:
       google-auth-library:
         specifier: ^10.4.0
         version: 10.4.0
-      googleapis:
-        specifier: ^161.0.0
-        version: 161.0.0
       langfuse-vercel:
         specifier: ^3.38.5
         version: 3.38.5(ai@5.0.40(zod@4.1.8))
@@ -2269,6 +2269,10 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
+
+  '@googleapis/gmail@15.0.0':
+    resolution: {integrity: sha512-H4VsX2Hnx8DFZ4KdtuurcAqFUerfvLiitKhqq4BTBUM1u4y8dgWoGeVjz7+gWtMJl6/hUDCd0H8JaiU7pFNaOA==}
+    engines: {node: '>=12.0.0'}
 
   '@grpc/grpc-js@1.13.4':
     resolution: {integrity: sha512-GsFaMXCkMqkKIvwCQjCrwH+GHbPKBjhwo/8ZuUkWHqbI73Kky9I+pQltrlT0+MWpedCoosda53lgjYfyEPgxBg==}
@@ -7731,10 +7735,6 @@ packages:
   googleapis-common@8.0.0:
     resolution: {integrity: sha512-66if47It7y+Sab3HMkwEXx1kCq9qUC9px8ZXoj1CMrmLmUw81GpbnsNlXnlyZyGbGPGcj+tDD9XsZ23m7GLaJQ==}
     engines: {node: '>=18.0.0'}
-
-  googleapis@161.0.0:
-    resolution: {integrity: sha512-JZy2cWMxgUF8E09KHzplI+z+FVG8NWDB/bsf4xevt9Um4bInb0X1qaG9qpDn49DHT5HsU0mOp3EOBGb8+AdE3Q==}
-    engines: {node: '>=18'}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -14386,6 +14386,12 @@ snapshots:
       - supports-color
       - utf-8-validate
 
+  '@googleapis/gmail@15.0.0':
+    dependencies:
+      googleapis-common: 8.0.0
+    transitivePeerDependencies:
+      - supports-color
+
   '@grpc/grpc-js@1.13.4':
     dependencies:
       '@grpc/proto-loader': 0.7.15
@@ -18636,6 +18642,14 @@ snapshots:
       '@babel/runtime': 7.28.3
       is-retry-allowed: 2.2.0
 
+  axios@1.12.0:
+    dependencies:
+      follow-redirects: 1.15.11
+      form-data: 4.0.4
+      proxy-from-env: 1.1.0
+    transitivePeerDependencies:
+      - debug
+
   axios@1.12.0(debug@4.4.1):
     dependencies:
       follow-redirects: 1.15.11(debug@4.4.1)
@@ -18646,7 +18660,7 @@ snapshots:
 
   axios@1.7.7:
     dependencies:
-      follow-redirects: 1.15.11(debug@4.4.1)
+      follow-redirects: 1.15.11
       form-data: 4.0.4
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
@@ -20806,6 +20820,8 @@ snapshots:
 
   flatted@3.3.3: {}
 
+  follow-redirects@1.15.11: {}
+
   follow-redirects@1.15.11(debug@4.4.1):
     optionalDependencies:
       debug: 4.4.1
@@ -21174,13 +21190,6 @@ snapshots:
       google-auth-library: 10.4.0
       qs: 6.14.0
       url-template: 2.0.8
-    transitivePeerDependencies:
-      - supports-color
-
-  googleapis@161.0.0:
-    dependencies:
-      google-auth-library: 10.4.0
-      googleapis-common: 8.0.0
     transitivePeerDependencies:
       - supports-color
 
@@ -22571,7 +22580,7 @@ snapshots:
     dependencies:
       '@commitlint/cli': 19.8.1(@types/node@24.3.1)(typescript@5.9.2)
       '@commitlint/config-conventional': 19.8.1
-      axios: 1.12.0(debug@4.4.1)
+      axios: 1.12.0
       semantic-release: 24.2.8(typescript@5.9.2)
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
