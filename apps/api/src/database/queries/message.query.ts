@@ -4,7 +4,7 @@ import { and, eq, asc, gte, desc, sql } from 'drizzle-orm';
 import { UIMessage } from 'ai';
 
 import { ChatSDKError } from "../../lib/errors";
-import { chat, DBMessage, message } from "../schemas/conversation.schema";
+import { chat, message } from "../schemas/conversation.schema";
 import { DATABASE_CONNECTION } from '../database-connection';
 import { databaseSchema } from '../schemas';
 import { mapDBPartToUIMessagePart, mapUIMessagePartsToDBParts } from '../../lib/message-mapping'
