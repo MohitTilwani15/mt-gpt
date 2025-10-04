@@ -8,6 +8,7 @@ import { DatabaseModule } from './database/database.module';
 import { DATABASE_CONNECTION } from './database/database-connection';
 import { ChatModule } from './chat/chat.module';
 import { AssistantModule } from './assistant/assistant.module';
+import { EmailAssistantModule } from './email-assistant/email-assistant.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -16,6 +17,7 @@ import { AppController } from './app.controller';
     DatabaseModule,
     ChatModule,
     AssistantModule,
+    EmailAssistantModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, ConfigModule],
       useFactory: (database: NodePgDatabase, configService: ConfigService) => ({
