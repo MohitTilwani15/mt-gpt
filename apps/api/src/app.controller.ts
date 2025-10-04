@@ -32,7 +32,7 @@ export class AppController {
   
       const jwtClient = new JWT({
         email: this.configService.getOrThrow<string>('GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL'),
-        key: this.configService.getOrThrow<string>('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY'),
+        key: this.configService.getOrThrow<string>('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY')?.replace(/\\n/g, '\n'),
         scopes,
         subject: 'mohit@alphalink.xyz',
       });
