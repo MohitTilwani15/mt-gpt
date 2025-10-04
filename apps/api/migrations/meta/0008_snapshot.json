@@ -1117,8 +1117,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.gmail_attachments": {
-      "name": "gmail_attachments",
+    "public.email_attachments": {
+      "name": "email_attachments",
       "schema": "",
       "columns": {
         "id": {
@@ -1154,10 +1154,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "gmail_attachments_message_id_gmail_messages_id_fk": {
-          "name": "gmail_attachments_message_id_gmail_messages_id_fk",
-          "tableFrom": "gmail_attachments",
-          "tableTo": "gmail_messages",
+        "email_attachments_message_id_email_messages_id_fk": {
+          "name": "email_attachments_message_id_email_messages_id_fk",
+          "tableFrom": "email_attachments",
+          "tableTo": "email_messages",
           "columnsFrom": [
             "message_id"
           ],
@@ -1174,8 +1174,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.gmail_messages": {
-      "name": "gmail_messages",
+    "public.email_messages": {
+      "name": "email_messages",
       "schema": "",
       "columns": {
         "id": {
