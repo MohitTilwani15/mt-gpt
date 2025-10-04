@@ -30,6 +30,8 @@ COPY packages/ ./packages/
 # Set working directory to API
 WORKDIR /usr/src/app/apps/api
 
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+
 # Build the API
 RUN pnpm run build
 
