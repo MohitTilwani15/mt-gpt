@@ -6,9 +6,10 @@ import { EmailProcessorService } from './email-processor.service';
 import { EmailSenderService } from './email-sender.service';
 import { EmailAssistantService } from './email-assistant.service';
 import { EmailAssistantQueryService } from 'src/database/queries/email-assistant.query';
+import { DatabaseModule } from 'src/database/database.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [DatabaseModule, ConfigModule],
   controllers: [EmailAssistantController],
   providers: [
     EmailAssistantQueryService,
