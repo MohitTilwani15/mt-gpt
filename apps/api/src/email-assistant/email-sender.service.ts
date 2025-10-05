@@ -1,20 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { gmail } from '@googleapis/gmail';
-import type { gmail_v1 } from '@googleapis/gmail';
 import { JWT } from 'google-auth-library';
 
 import { ConfigService } from '@nestjs/config';
 
 import { EmailAssistantQueryService } from 'src/database/queries/email-assistant.query';
-
-interface SendReplyParams {
-  userEmail: string;
-  rawMime: string;
-  threadId?: string | null;
-  toEmail?: string | null;
-  subject?: string | null;
-  snippet?: string | null;
-}
 
 @Injectable()
 export class EmailSenderService {
@@ -23,8 +13,7 @@ export class EmailSenderService {
     private readonly emailAssistantQuery: EmailAssistantQueryService,
   ) {}
 
-  async sendReply(params: SendReplyParams) {
-    const { userEmail, rawMime, threadId, toEmail = null, subject = null, snippet = null } = params;
+  async sendReply(userEmail: string, rawMime: string) {
     const jwt = new JWT({
       email: this.config.get('GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL'),
       key: this.config.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY').replace(/\\n/g, '\n'),
@@ -37,10 +26,7 @@ export class EmailSenderService {
 
     const res = await gmailClient.users.messages.send({
       userId: 'me',
-      requestBody: {
-        raw: encoded,
-        threadId: threadId ?? undefined,
-      },
+      requestBody: { raw: encoded },
     });
 
     const sent = res.data;
@@ -50,71 +36,15 @@ export class EmailSenderService {
 
     await this.emailAssistantQuery.saveOutboundMessage({
       id: sent.id,
-      threadId: sent.threadId ?? threadId ?? null,
+      threadId: sent.threadId ?? null,
       fromEmail: userEmail,
-      toEmail,
-      subject,
-      snippet: sent.snippet ?? snippet ?? null,
+      toEmail: '(recipient)',
+      subject: '(subject)',
+      snippet: sent.snippet ?? null,
       body: rawMime,
       receivedAt: new Date(),
     });
 
     return sent;
-  }
-
-  async sendAutoReply(params: {
-    userEmail: string;
-    originalMessage: gmail_v1.Schema$Message;
-    body?: string;
-  }) {
-    const { userEmail, originalMessage, body } = params;
-    const headers = this.extractHeaders(originalMessage.payload?.headers);
-    const recipient = headers.get('from') ?? null;
-    const subject = headers.get('subject') ?? null;
-    const messageId = headers.get('message-id') ?? null;
-
-    if (!recipient) {
-      throw new Error('email-sender:missing-recipient');
-    }
-
-    const normalizedSubject = subject && subject.toLowerCase().startsWith('re:')
-      ? subject
-      : `Re: ${subject ?? 'No subject'}`;
-
-    const replyBody = body ?? 'Thanks for your message! This is an automated test reply.';
-    const lines = [
-      `From: ${userEmail}`,
-      `To: ${recipient}`,
-      `Subject: ${normalizedSubject}`,
-    ];
-
-    if (messageId) {
-      lines.push(`In-Reply-To: ${messageId}`);
-      lines.push(`References: ${messageId}`);
-    }
-
-    lines.push('Content-Type: text/plain; charset="UTF-8"');
-    lines.push('');
-    lines.push(replyBody);
-
-    const rawMime = lines.join('\r\n');
-
-    await this.sendReply({
-      userEmail,
-      rawMime,
-      threadId: originalMessage.threadId ?? null,
-      toEmail: recipient,
-      subject: normalizedSubject,
-      snippet: replyBody,
-    });
-  }
-
-  private extractHeaders(headers: gmail_v1.Schema$MessagePartHeader[] | undefined) {
-    const map = new Map<string, string>();
-    for (const header of headers ?? []) {
-      if (!header.name || !header.value) continue;
-      map.set(header.name.toLowerCase(), header.value);
-    }
-    return map;
   }
 }
