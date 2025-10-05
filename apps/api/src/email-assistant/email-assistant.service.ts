@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { GmailSyncStateService } from './gmail-sync-state.service';
 import { EmailProcessorService } from './email-processor.service';
+import { JobQueueService } from 'src/queue/job-queue.service';
 
 export interface PubSubMessage {
   data: string;
@@ -52,6 +53,7 @@ export class EmailAssistantService {
     private readonly config: ConfigService,
     private readonly gmailSyncStateService: GmailSyncStateService,
     private readonly emailProcessor: EmailProcessorService,
+    private readonly jobQueueService: JobQueueService,
   ) {}
 
   async handlePubSubPush(body: PubSubPushBody, authorizationHeader?: string) {
@@ -78,7 +80,7 @@ export class EmailAssistantService {
         return this.handleNoNewMessages(authContext, envelopeSummary);
       }
 
-      await this.processAddedMessages(authContext.gmailClient, addedMessages);
+      await this.processAddedMessages(authContext, addedMessages);
       return this.handleProcessedMessages(authContext, lastHistoryIdUsed, envelopeSummary);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -166,13 +168,76 @@ export class EmailAssistantService {
   }
 
   private async processAddedMessages(
-    gmailClient: gmail_v1.Gmail,
+    authContext: AuthContext,
     addedMessages: AddedMessageWithId[],
   ) {
     for (const { message: { id } } of addedMessages) {
-      const msg = await gmailClient.users.messages.get({ userId: 'me', id, format: 'full' });
-      await this.emailProcessor.saveInboundMessage(msg.data, gmailClient);
+      const msg = await authContext.gmailClient.users.messages.get({ userId: 'me', id, format: 'full' });
+      await this.emailProcessor.saveInboundMessage(msg.data, authContext.gmailClient);
+
+      await this.enqueueEmailReplyJob(authContext.userEmail, msg.data).catch((error) =>
+        this.logger.error(`Failed to enqueue email reply for message ${id}: ${error instanceof Error ? error.message : error}`),
+      );
     }
+  }
+
+  private async enqueueEmailReplyJob(userEmail: string, message: gmail_v1.Schema$Message) {
+    if (!message) return;
+    const headers = this.extractHeaders(message.payload?.headers);
+    const sender = this.extractEmailAddress(headers.get('from'));
+    const subject = headers.get('subject') ?? '(no subject)';
+
+    if (!sender) {
+      this.logger.debug(`Skipping reply for message ${message.id}; sender not found.`);
+      return;
+    }
+
+    if (this.isSameMailbox(sender, userEmail)) {
+      this.logger.debug(`Skipping reply for message ${message.id}; appears to originate from mailbox user.`);
+      return;
+    }
+
+    const body = this.generatePlaceholderReply();
+
+    await this.jobQueueService.enqueueEmailReply({
+      userEmail,
+      messageId: message.id!,
+      threadId: message.threadId,
+      toEmail: sender,
+      subject,
+      body,
+    });
+  }
+
+  private extractHeaders(headers: gmail_v1.Schema$MessagePartHeader[] | undefined) {
+    const map = new Map<string, string>();
+    for (const header of headers ?? []) {
+      if (!header.name || !header.value) continue;
+      map.set(header.name.toLowerCase(), header.value);
+    }
+    return map;
+  }
+
+  private extractEmailAddress(headerValue?: string | null): string | null {
+    if (!headerValue) return null;
+    const match = headerValue.match(/<([^>]+)>/);
+    const email = match ? match[1] : headerValue;
+    return email.trim().toLowerCase();
+  }
+
+  private isSameMailbox(emailA: string, emailB: string | null) {
+    if (!emailB) return false;
+    return emailA.trim().toLowerCase() === emailB.trim().toLowerCase();
+  }
+
+  private generatePlaceholderReply() {
+    const templates = [
+      'Thanks for reaching out! We received your message and will follow up shortly.',
+      'Appreciate the email—this is an automated acknowledgement while we prepare a full reply.',
+      'Hi there! Quick note to say your message is in good hands. Expect a detailed response soon.',
+    ];
+    const index = Math.floor(Math.random() * templates.length);
+    return templates[index] ?? templates[0];
   }
 
   private async handleNoNewMessages(authContext: AuthContext, envelopeSummary: EnvelopeSummary) {

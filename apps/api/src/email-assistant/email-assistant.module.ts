@@ -7,9 +7,11 @@ import { EmailSenderService } from './email-sender.service';
 import { EmailAssistantService } from './email-assistant.service';
 import { EmailAssistantQueryService } from 'src/database/queries/email-assistant.query';
 import { DatabaseModule } from 'src/database/database.module';
+import { EmailReplyProcessor } from './processors/email-reply.processor';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
-  imports: [DatabaseModule, ConfigModule],
+  imports: [DatabaseModule, ConfigModule, QueueModule],
   controllers: [EmailAssistantController],
   providers: [
     EmailAssistantQueryService,
@@ -17,6 +19,7 @@ import { DatabaseModule } from 'src/database/database.module';
     GmailSyncStateService,
     EmailProcessorService,
     EmailSenderService,
+    EmailReplyProcessor,
   ],
   exports: [EmailSenderService],
 })

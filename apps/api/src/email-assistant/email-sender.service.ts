@@ -13,7 +13,11 @@ export class EmailSenderService {
     private readonly emailAssistantQuery: EmailAssistantQueryService,
   ) {}
 
-  async sendReply(userEmail: string, rawMime: string) {
+  async sendReply(
+    userEmail: string,
+    rawMime: string,
+    metadata?: { threadId?: string | null; toEmail?: string | null; subject?: string | null; snippet?: string | null },
+  ) {
     const jwt = new JWT({
       email: this.config.get('GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL'),
       key: this.config.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY').replace(/\\n/g, '\n'),
@@ -26,7 +30,10 @@ export class EmailSenderService {
 
     const res = await gmailClient.users.messages.send({
       userId: 'me',
-      requestBody: { raw: encoded },
+      requestBody: {
+        raw: encoded,
+        threadId: metadata?.threadId ?? undefined,
+      },
     });
 
     const sent = res.data;
@@ -36,11 +43,11 @@ export class EmailSenderService {
 
     await this.emailAssistantQuery.saveOutboundMessage({
       id: sent.id,
-      threadId: sent.threadId ?? null,
+      threadId: sent.threadId ?? metadata?.threadId ?? null,
       fromEmail: userEmail,
-      toEmail: '(recipient)',
-      subject: '(subject)',
-      snippet: sent.snippet ?? null,
+      toEmail: metadata?.toEmail ?? '(recipient)',
+      subject: metadata?.subject ?? '(subject)',
+      snippet: sent.snippet ?? metadata?.snippet ?? null,
       body: rawMime,
       receivedAt: new Date(),
     });
