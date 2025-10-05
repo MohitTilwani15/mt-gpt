@@ -13,6 +13,7 @@ export class EmailAssistantController {
     @Headers('authorization') authorization?: string,
   ) {
     console.log('JSON.stringify(body, null, 2): ', JSON.stringify(body, null, 2));
+    console.log('authorization: ', authorization);
     return this.emailAssistantService.handlePubSubPush(body, authorization);
   }
 }
