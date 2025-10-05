@@ -1,15 +1,12 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
-import { openai } from '@ai-sdk/openai';
-import { embed } from 'ai';
-import { extractText, getDocumentProxy } from 'unpdf';
-import * as mammoth from 'mammoth';
 
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { databaseSchema } from '../../database/schemas';
+import { JobQueueService } from '../../queue/job-queue.service';
+import { FileProcessingJobPayload } from '../../queue/jobs';
 
 
 export interface CreateFileDocumentParams {
@@ -29,43 +26,18 @@ export class FileDocumentService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly db: NodePgDatabase<typeof databaseSchema>,
     private readonly cloudflareR2Service: CloudflareR2Service,
-    private readonly configService: ConfigService,
+    private readonly jobQueueService: JobQueueService,
   ) {}
 
   async createFileDocument(params: CreateFileDocumentParams) {
-    const { chatId, file, extractText: shouldExtractText = false, userId } = params;
+    const { chatId, file, extractText, userId } = params;
+    const shouldExtractText = this.normalizeBooleanFlag(extractText);
     
     const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
       file,
     });
 
-    let textContent = null;
-    let embedding = null;
-
     try {
-      if (shouldExtractText) {
-        try {
-          if (file.mimetype === 'application/pdf') {
-            const pdf = await getDocumentProxy(new Uint8Array(file.buffer));
-            const { text } = await extractText(pdf, { mergePages: true });
-            textContent = text;
-          } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-            const result = await mammoth.extractRawText({ buffer: file.buffer });
-            textContent = result.value;
-          }
-  
-          if (textContent && textContent.trim()) {
-            const { embedding: textEmbedding } = await embed({
-              model: openai.embedding(this.configService.getOrThrow<string>('EMBEDDING_MODEL')),
-              value: textContent,
-            });
-            embedding = textEmbedding;
-          }
-        } catch (error) {
-          console.warn(`Failed to extract text from ${file.mimetype}:`, error);
-        }
-      }
-
       const [document] = await this.db.transaction(async (tx) => {
         const existingChat = await tx
           .select()
@@ -92,8 +64,8 @@ export class FileDocumentService {
             fileKey,
             fileSize: file.size,
             mimeType: file.mimetype,
-            text: textContent,
-            embedding,
+            text: null,
+            embedding: null,
             createdAt: new Date(),
           })
           .returning();
@@ -101,12 +73,27 @@ export class FileDocumentService {
         return [doc];
       });
   
+      if (shouldExtractText) {
+        const jobPayload: FileProcessingJobPayload = {
+          documentId: document.id,
+          chatId,
+          fileKey,
+          mimeType: file.mimetype,
+          fileName: file.originalname,
+          extractText: true,
+          userId,
+        };
+
+        await this.enqueueFileProcessingJob(jobPayload);
+      }
+
       return {
         id: document.id,
         mimeType: document.mimeType,
         fileName: document.fileName,
         fileSize: document.fileSize,
-        downloadUrl
+        downloadUrl,
+        processingQueued: shouldExtractText,
       };
     } catch (error) {
       await this.cloudflareR2Service.deleteFile(fileKey).catch(() => {});
@@ -132,5 +119,23 @@ export class FileDocumentService {
     );
 
     return Promise.all(createPromises);
+  }
+
+  private async enqueueFileProcessingJob(payload: FileProcessingJobPayload) {
+    try {
+      await this.jobQueueService.enqueueFileProcessing(payload);
+    } catch (error) {
+      console.error('Failed to enqueue file processing job', error);
+    }
+  }
+
+  private normalizeBooleanFlag(value: unknown): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
+      if (['false', '0', 'no', 'n', 'off', ''].includes(normalized)) return false;
+    }
+    return Boolean(value);
   }
 }

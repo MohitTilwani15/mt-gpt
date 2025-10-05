@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
+import { Readable } from 'stream';
 
 export interface FileUploadParams {
   file: Express.Multer.File;
@@ -79,6 +80,34 @@ export class CloudflareR2Service {
     const u = new URL(url);
     u.searchParams.set('response-content-disposition', `attachment; filename="${asAttachmentName}"`);
     return u.toString();
+  }
+
+  async getFileBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    const response = await this.s3Client.send(command);
+    const body = response.Body;
+
+    if (!body) {
+      throw new Error(`Object ${key} has no body`);
+    }
+
+    const readable = body as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of readable) {
+      if (Buffer.isBuffer(chunk)) {
+        chunks.push(chunk);
+      } else if (typeof chunk === 'string') {
+        chunks.push(Buffer.from(chunk));
+      } else {
+        chunks.push(Buffer.from(chunk));
+      }
+    }
+
+    return Buffer.concat(chunks);
   }
 
   async deleteFile(key: string): Promise<void> {

@@ -20,13 +20,18 @@ import { Mem0MemoryService } from './services/mem0-memory.service';
 import { McpToolService } from './services/mcp-tool.service';
 import { TextProcessingService } from './services/text-processing.service';
 import { AIResponseService } from './services/ai-response.service';
+import { DocumentProcessingService } from './services/document-processing.service';
+import { DocumentProcessingProcessor } from './processors/document-processing.processor';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
-  imports: [DatabaseModule, ConfigModule],
+  imports: [DatabaseModule, ConfigModule, QueueModule],
   controllers: [ChatController, FileController],
   providers: [
     ChatService,
     FileDocumentService,
+    DocumentProcessingService,
+    DocumentProcessingProcessor,
     CloudflareR2Service,
     CloudflareAIGatewayService,
     ChatQueryService,
