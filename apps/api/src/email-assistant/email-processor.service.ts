@@ -7,12 +7,12 @@ import { EmailAssistantQueryService } from 'src/database/queries/email-assistant
 export class EmailProcessorService {
   constructor(private readonly emailAssistantQuery: EmailAssistantQueryService) {}
 
-  async saveInboundMessage(message: any, gmailClient: ReturnType<typeof gmail>) {
+  async saveInboundMessage(message: any, gmailClient: ReturnType<typeof gmail>): Promise<boolean> {
     const headers = Object.fromEntries(message.payload.headers.map(h => [h.name, h.value]));
     const body = this.extractPlainText(message.payload);
     const attachments = await this.extractAttachments(message, gmailClient);
 
-    await this.emailAssistantQuery.saveInboundMessage({
+    return this.emailAssistantQuery.saveInboundMessage({
       id: message.id,
       threadId: message.threadId,
       fromEmail: headers['From'] ?? null,

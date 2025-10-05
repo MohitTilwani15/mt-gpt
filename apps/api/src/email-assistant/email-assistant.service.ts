@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { GmailSyncStateService } from './gmail-sync-state.service';
 import { EmailProcessorService } from './email-processor.service';
+import { EmailSenderService } from './email-sender.service';
 
 export interface PubSubMessage {
   data: string;
@@ -52,6 +53,7 @@ export class EmailAssistantService {
     private readonly config: ConfigService,
     private readonly gmailSyncStateService: GmailSyncStateService,
     private readonly emailProcessor: EmailProcessorService,
+    private readonly emailSender: EmailSenderService,
   ) {}
 
   async handlePubSubPush(body: PubSubPushBody, authorizationHeader?: string) {
@@ -78,7 +80,7 @@ export class EmailAssistantService {
         return this.handleNoNewMessages(authContext, envelopeSummary);
       }
 
-      await this.processAddedMessages(authContext.gmailClient, addedMessages);
+      await this.processAddedMessages(authContext, addedMessages);
       return this.handleProcessedMessages(authContext, lastHistoryIdUsed, envelopeSummary);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -166,13 +168,57 @@ export class EmailAssistantService {
   }
 
   private async processAddedMessages(
-    gmailClient: gmail_v1.Gmail,
+    authContext: AuthContext,
     addedMessages: AddedMessageWithId[],
   ) {
     for (const { message: { id } } of addedMessages) {
-      const msg = await gmailClient.users.messages.get({ userId: 'me', id, format: 'full' });
-      await this.emailProcessor.saveInboundMessage(msg.data, gmailClient);
+      const msg = await authContext.gmailClient.users.messages.get({ userId: 'me', id, format: 'full' });
+      const headers = this.extractHeaders(msg.data.payload?.headers);
+      const fromHeader = headers.get('from');
+      const fromEmail = this.extractEmailAddress(fromHeader);
+
+      if (fromEmail && this.isSameMailbox(fromEmail, authContext.userEmail)) {
+        this.logger.debug(`Skipping message ${id} because it originated from mailbox user.`);
+        continue;
+      }
+
+      const stored = await this.emailProcessor.saveInboundMessage(msg.data, authContext.gmailClient);
+      if (!stored) {
+        this.logger.debug(`Message ${id} already stored; skipping auto-reply.`);
+        continue;
+      }
+
+      try {
+        await this.emailSender.sendAutoReply({
+          userEmail: authContext.userEmail,
+          originalMessage: msg.data,
+        });
+        this.logger.debug(`Sent auto-reply for message ${id}`);
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.logger.error(`Failed to send auto-reply for message ${id}: ${err.message}`, err.stack);
+      }
     }
+  }
+
+  private extractHeaders(headers: gmail_v1.Schema$MessagePartHeader[] | undefined) {
+    const map = new Map<string, string>();
+    for (const header of headers ?? []) {
+      if (!header.name || !header.value) continue;
+      map.set(header.name.toLowerCase(), header.value);
+    }
+    return map;
+  }
+
+  private extractEmailAddress(headerValue?: string | null): string | null {
+    if (!headerValue) return null;
+    const match = headerValue.match(/<([^>]+)>/);
+    const email = match ? match[1] : headerValue;
+    return email.trim().toLowerCase();
+  }
+
+  private isSameMailbox(emailA: string, emailB: string) {
+    return emailA.trim().toLowerCase() === emailB.trim().toLowerCase();
   }
 
   private async handleNoNewMessages(authContext: AuthContext, envelopeSummary: EnvelopeSummary) {

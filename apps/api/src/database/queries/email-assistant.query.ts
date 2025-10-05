@@ -63,7 +63,7 @@ export class EmailAssistantQueryService {
       });
   }
 
-  async saveInboundMessage(params: SaveInboundMessageParams): Promise<void> {
+  async saveInboundMessage(params: SaveInboundMessageParams): Promise<boolean> {
     const {
       id,
       threadId = null,
@@ -76,7 +76,17 @@ export class EmailAssistantQueryService {
       attachments,
     } = params;
 
-    await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: emailMessages.id })
+        .from(emailMessages)
+        .where(eq(emailMessages.id, id))
+        .limit(1);
+
+      if (existing) {
+        return false;
+      }
+
       await tx
         .insert(emailMessages)
         .values({
@@ -94,7 +104,7 @@ export class EmailAssistantQueryService {
         .onConflictDoNothing();
 
       if (!attachments.length) {
-        return;
+        return true;
       }
 
       const attachmentValues = attachments.map((attachment) => ({
@@ -105,6 +115,7 @@ export class EmailAssistantQueryService {
       }));
 
       await tx.insert(emailAttachments).values(attachmentValues);
+      return true;
     });
   }
 
