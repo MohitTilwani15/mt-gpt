@@ -5,7 +5,7 @@ import { Job } from 'bullmq';
 import { EmailReplyJobPayload } from 'src/queue/jobs';
 import { EMAIL_REPLY_QUEUE } from 'src/queue/queue.constants';
 import { SEND_EMAIL_REPLY_JOB } from 'src/queue/job.constants';
-import { EmailSenderService } from '../email-sender.service';
+import { EmailSenderService } from '../services/email-sender.service';
 
 @Processor(EMAIL_REPLY_QUEUE)
 @Injectable()

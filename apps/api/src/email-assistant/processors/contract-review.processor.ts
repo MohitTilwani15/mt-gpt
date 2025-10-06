@@ -5,7 +5,7 @@ import { Job } from 'bullmq';
 import { ContractReviewJobPayload } from 'src/queue/jobs';
 import { CONTRACT_REVIEW_QUEUE } from 'src/queue/queue.constants';
 import { REVIEW_CONTRACT_JOB } from 'src/queue/job.constants';
-import { ContractReviewService } from '../contract-review.service';
+import { ContractReviewService } from '../services/contract-review.service';
 import { JobQueueService } from 'src/queue/job-queue.service';
 
 @Processor(CONTRACT_REVIEW_QUEUE)

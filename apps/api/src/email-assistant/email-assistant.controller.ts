@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, HttpCode, Post } from '@nestjs/common';
 
-import { EmailAssistantService, PubSubPushBody } from './email-assistant.service';
+import { EmailAssistantService, PubSubPushBody } from './services/email-assistant.service';
 
 @Controller()
 export class EmailAssistantController {

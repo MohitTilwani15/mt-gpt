@@ -4,12 +4,12 @@ import { OAuth2Client } from 'google-auth-library';
 import type { TokenPayload } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 
-import { GmailSyncStateService } from './gmail-sync-state.service';
+import { GmailSyncStateService } from './gmail/gmail-sync-state.service';
 import { EmailProcessorService } from './email-processor.service';
 import { JobQueueService } from 'src/queue/job-queue.service';
-import { GmailAuthService, GmailAuthContext } from './gmail-auth.service';
-import { GmailHistoryService } from './gmail-history.service';
-import { GmailMessageParserService, HistoryMessageAdded } from './gmail-message-parser.service';
+import { GmailAuthService, GmailAuthContext } from './gmail/gmail-auth.service';
+import { GmailHistoryService } from './gmail/gmail-history.service';
+import { GmailMessageParserService, HistoryMessageAdded } from './gmail/gmail-message-parser.service';
 
 export interface PubSubMessage {
   data: string;
