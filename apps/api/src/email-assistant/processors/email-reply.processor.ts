@@ -22,10 +22,16 @@ export class EmailReplyProcessor extends WorkerHost {
       return;
     }
 
-    const { userEmail, body, subject, toEmail, threadId } = job.data;
+    const { userEmail, body, subject, toEmail, threadId, attachments } = job.data;
 
-    const rawMime = this.composeMinimalReply({ userEmail, toEmail, subject, body });
-    await this.emailSender.sendReply(userEmail, rawMime, { threadId, toEmail, subject, snippet: body.slice(0, 100) });
+    await this.emailSender.sendReply({
+      userEmail,
+      toEmail,
+      subject,
+      body,
+      threadId,
+      attachments,
+    });
   }
 
   @OnWorkerEvent('completed')
@@ -48,24 +54,5 @@ export class EmailReplyProcessor extends WorkerHost {
   @OnQueueEvent('waiting')
   onWaiting({ jobId }: { jobId: string }) {
     this.logger.debug(`Email reply job ${jobId} queued.`);
-  }
-
-  private composeMinimalReply(params: {
-    userEmail: string;
-    toEmail: string;
-    subject: string;
-    body: string;
-  }) {
-    const { userEmail, toEmail, subject, body } = params;
-    const normalizedSubject = subject?.toLowerCase().startsWith('re:') ? subject : `Re: ${subject ?? ''}`;
-
-    return [
-      `From: ${userEmail}`,
-      `To: ${toEmail}`,
-      `Subject: ${normalizedSubject}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      '',
-      body,
-    ].join('\r\n');
   }
 }

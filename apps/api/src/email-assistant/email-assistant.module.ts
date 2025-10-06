@@ -9,6 +9,11 @@ import { EmailAssistantQueryService } from 'src/database/queries/email-assistant
 import { DatabaseModule } from 'src/database/database.module';
 import { EmailReplyProcessor } from './processors/email-reply.processor';
 import { QueueModule } from 'src/queue/queue.module';
+import { ContractReviewService } from './contract-review.service';
+import { ContractReviewProcessor } from './processors/contract-review.processor';
+import { GmailAuthService } from './gmail-auth.service';
+import { GmailHistoryService } from './gmail-history.service';
+import { GmailMessageParserService } from './gmail-message-parser.service';
 
 @Module({
   imports: [DatabaseModule, ConfigModule, QueueModule],
@@ -20,6 +25,11 @@ import { QueueModule } from 'src/queue/queue.module';
     EmailProcessorService,
     EmailSenderService,
     EmailReplyProcessor,
+    ContractReviewService,
+    ContractReviewProcessor,
+    GmailAuthService,
+    GmailHistoryService,
+    GmailMessageParserService,
   ],
   exports: [EmailSenderService],
 })

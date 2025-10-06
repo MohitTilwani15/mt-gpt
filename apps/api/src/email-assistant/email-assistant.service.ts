@@ -1,13 +1,15 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { gmail } from '@googleapis/gmail';
 import type { gmail_v1 } from '@googleapis/gmail';
-import { JWT, OAuth2Client } from 'google-auth-library';
+import { OAuth2Client } from 'google-auth-library';
 import type { TokenPayload } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 
 import { GmailSyncStateService } from './gmail-sync-state.service';
 import { EmailProcessorService } from './email-processor.service';
 import { JobQueueService } from 'src/queue/job-queue.service';
+import { GmailAuthService, GmailAuthContext } from './gmail-auth.service';
+import { GmailHistoryService } from './gmail-history.service';
+import { GmailMessageParserService, HistoryMessageAdded } from './gmail-message-parser.service';
 
 export interface PubSubMessage {
   data: string;
@@ -36,14 +38,6 @@ interface EnvelopeSummary {
   tokenIssuer?: string;
 }
 
-interface AuthContext {
-  userEmail: string;
-  historyId: string;
-  gmailClient: gmail_v1.Gmail;
-}
-
-type AddedMessageWithId = gmail_v1.Schema$HistoryMessageAdded & { message: { id: string } };
-
 @Injectable()
 export class EmailAssistantService {
   private readonly logger = new Logger(EmailAssistantService.name);
@@ -54,12 +48,15 @@ export class EmailAssistantService {
     private readonly gmailSyncStateService: GmailSyncStateService,
     private readonly emailProcessor: EmailProcessorService,
     private readonly jobQueueService: JobQueueService,
+    private readonly gmailAuthService: GmailAuthService,
+    private readonly gmailHistoryService: GmailHistoryService,
+    private readonly gmailMessageParser: GmailMessageParserService,
   ) {}
 
   async handlePubSubPush(body: PubSubPushBody, authorizationHeader?: string) {
     const envelopeSummary = this.buildEnvelopeSummary(body);
     let decoded: GmailHistoryNotification | null = null;
-    let authContext: AuthContext | null = null;
+    let authContext: GmailAuthContext | null = null;
     let tokenPayload: TokenPayload | null = null;
 
     try {
@@ -71,17 +68,24 @@ export class EmailAssistantService {
       envelopeSummary.tokenIssuer = tokenPayload.iss;
 
       decoded = this.decodePubSubMessage(body);
-      authContext = await this.createAuthContext(decoded.emailAddress, decoded.historyId);
+      authContext = this.gmailAuthService.createContext(decoded.emailAddress, decoded.historyId);
 
-      const { historyEntries, lastHistoryIdUsed } = await this.fetchHistory(authContext);
-      const addedMessages = this.extractAddedMessages(historyEntries);
+      const { historyEntries, lastHistoryIdUsed, responseHistoryId } = await this.fetchHistory(authContext);
+      const addedMessages = this.gmailMessageParser.extractAddedMessages(historyEntries);
 
       if (!addedMessages.length) {
-        return this.handleNoNewMessages(authContext, envelopeSummary);
+        return this.handleNoNewMessages(authContext, envelopeSummary, responseHistoryId);
       }
 
       await this.processAddedMessages(authContext, addedMessages);
-      return this.handleProcessedMessages(authContext, lastHistoryIdUsed, envelopeSummary);
+
+      return this.handleProcessedMessages(
+        authContext,
+        lastHistoryIdUsed,
+        historyEntries,
+        responseHistoryId,
+        envelopeSummary,
+      );
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(`Email-assistant error: ${error.message}`, error.stack);
@@ -120,109 +124,72 @@ export class EmailAssistantService {
     return decoded;
   }
 
-  private async createAuthContext(userEmail: string, historyId: string | number): Promise<AuthContext> {
-    const normalizedHistoryId = String(historyId);
-    const jwt = new JWT({
-      email: this.config.get('GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL'),
-      key: this.config.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY').replace(/\\n/g, '\n'),
-      scopes: [
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/gmail.modify',
-      ],
-      subject: userEmail,
-    });
-
-    const gmailClient = gmail({ version: 'v1', auth: jwt });
-
-    return {
-      userEmail,
-      historyId: normalizedHistoryId,
-      gmailClient,
-    };
-  }
-
-  private async fetchHistory(authContext: AuthContext): Promise<{
+  private async fetchHistory(authContext: GmailAuthContext): Promise<{
     historyEntries: gmail_v1.Schema$History[];
     lastHistoryIdUsed: string;
+    responseHistoryId: string | null;
   }> {
-    const { gmailClient, userEmail, historyId } = authContext;
-    const lastHistoryId = await this.gmailSyncStateService.getLastHistoryId(userEmail);
-    const startHistoryId = lastHistoryId ?? historyId;
+    const lastHistoryId = await this.gmailSyncStateService.getLastHistoryId(authContext.userEmail);
 
-    const historyRes = await gmailClient.users.history.list({
-      userId: 'me',
-      startHistoryId,
-      historyTypes: ['messageAdded'],
+    return this.gmailHistoryService.fetchHistory({
+      gmailClient: authContext.client,
+      historyId: authContext.historyId,
+      lastStoredHistoryId: lastHistoryId,
     });
-
-    return {
-      historyEntries: historyRes.data.history ?? [],
-      lastHistoryIdUsed: startHistoryId,
-    };
   }
 
-  private extractAddedMessages(historyEntries: gmail_v1.Schema$History[]): AddedMessageWithId[] {
-    return historyEntries
-      .flatMap((entry) => entry.messagesAdded ?? [])
-      .filter((added): added is AddedMessageWithId => typeof added.message?.id === 'string');
-  }
-
-  private async processAddedMessages(
-    authContext: AuthContext,
-    addedMessages: AddedMessageWithId[],
-  ) {
+  private async processAddedMessages(authContext: GmailAuthContext, addedMessages: HistoryMessageAdded[]) {
     for (const { message: { id } } of addedMessages) {
-      const msg = await authContext.gmailClient.users.messages.get({ userId: 'me', id, format: 'full' });
-      await this.emailProcessor.saveInboundMessage(msg.data, authContext.gmailClient);
+      let msg;
 
-      await this.enqueueEmailReplyJob(authContext.userEmail, msg.data).catch((error) =>
-        this.logger.error(`Failed to enqueue email reply for message ${id}: ${error instanceof Error ? error.message : error}`),
-      );
+      try {
+        msg = await authContext.client.users.messages.get({ userId: 'me', id, format: 'full' });
+      } catch (error) {
+        const status = (error as any)?.code ?? (error as any)?.response?.status;
+        if (status === 404) {
+          this.logger.warn(`Message ${id} no longer available; skipping.`);
+          continue;
+        }
+        throw error;
+      }
+
+      const isNewMessage = await this.emailProcessor.saveInboundMessage(msg.data, authContext.client);
+
+      if (!isNewMessage) {
+        this.logger.debug(`Message ${id} already processed; skipping auto actions.`);
+        continue;
+      }
+
+      const headers = this.gmailMessageParser.extractHeaders(msg.data.payload?.headers);
+      const senderEmail = this.gmailMessageParser.extractEmailAddress(headers.get('from'));
+      const subject = headers.get('subject') ?? '(no subject)';
+
+      if (!senderEmail || this.isSameMailbox(senderEmail, authContext.userEmail)) {
+        this.logger.debug(`Skipping auto actions for message ${id}; sender email missing or same as mailbox.`);
+        continue;
+      }
+
+      const hasAttachments = this.gmailMessageParser.hasAttachments(msg.data.payload?.parts ?? []);
+      if (!hasAttachments) {
+        this.logger.debug(`Message ${id} has no attachments; skipping contract review enqueue.`);
+        continue;
+      }
+
+      await this.jobQueueService
+        .enqueueContractReview({
+          messageId: msg.data.id!,
+          userEmail: authContext.userEmail,
+          senderEmail,
+          subject,
+          threadId: msg.data.threadId,
+          contractType: 'unknown',
+        })
+        .catch((error) =>
+          this.logger.error(
+            `Failed to enqueue contract review for message ${id}: ${error instanceof Error ? error.message : error}`,
+          ),
+        );
     }
-  }
-
-  private async enqueueEmailReplyJob(userEmail: string, message: gmail_v1.Schema$Message) {
-    if (!message) return;
-    const headers = this.extractHeaders(message.payload?.headers);
-    const sender = this.extractEmailAddress(headers.get('from'));
-    const subject = headers.get('subject') ?? '(no subject)';
-
-    if (!sender) {
-      this.logger.debug(`Skipping reply for message ${message.id}; sender not found.`);
-      return;
-    }
-
-    if (this.isSameMailbox(sender, userEmail)) {
-      this.logger.debug(`Skipping reply for message ${message.id}; appears to originate from mailbox user.`);
-      return;
-    }
-
-    const body = this.generatePlaceholderReply();
-
-    await this.jobQueueService.enqueueEmailReply({
-      userEmail,
-      messageId: message.id!,
-      threadId: message.threadId,
-      toEmail: sender,
-      subject,
-      body,
-    });
-  }
-
-  private extractHeaders(headers: gmail_v1.Schema$MessagePartHeader[] | undefined) {
-    const map = new Map<string, string>();
-    for (const header of headers ?? []) {
-      if (!header.name || !header.value) continue;
-      map.set(header.name.toLowerCase(), header.value);
-    }
-    return map;
-  }
-
-  private extractEmailAddress(headerValue?: string | null): string | null {
-    if (!headerValue) return null;
-    const match = headerValue.match(/<([^>]+)>/);
-    const email = match ? match[1] : headerValue;
-    return email.trim().toLowerCase();
   }
 
   private isSameMailbox(emailA: string, emailB: string | null) {
@@ -230,40 +197,42 @@ export class EmailAssistantService {
     return emailA.trim().toLowerCase() === emailB.trim().toLowerCase();
   }
 
-  private generatePlaceholderReply() {
-    const templates = [
-      'Thanks for reaching out! We received your message and will follow up shortly.',
-      'Appreciate the email—this is an automated acknowledgement while we prepare a full reply.',
-      'Hi there! Quick note to say your message is in good hands. Expect a detailed response soon.',
-    ];
-    const index = Math.floor(Math.random() * templates.length);
-    return templates[index] ?? templates[0];
-  }
-
-  private async handleNoNewMessages(authContext: AuthContext, envelopeSummary: EnvelopeSummary) {
-    await this.gmailSyncStateService.saveLastHistoryId(authContext.userEmail, authContext.historyId);
-    const response = { status: 'no_new_messages' as const };
+  private async handleNoNewMessages(
+    authContext: GmailAuthContext,
+    envelopeSummary: EnvelopeSummary,
+    responseHistoryId: string | null,
+  ) {
+    const toStore = responseHistoryId ?? authContext.historyId;
+    await this.gmailSyncStateService.saveLastHistoryId(authContext.userEmail, toStore);
+    const response = { status: 'no_new_messages' };
     this.logger.log(
-      `Processed Pub/Sub push: ${JSON.stringify({ ...envelopeSummary, historyId: authContext.historyId, status: response.status })}`,
+      `Processed Pub/Sub push: ${JSON.stringify({ ...envelopeSummary, historyId: toStore, status: response.status })}`,
     );
+
     return response;
   }
 
   private async handleProcessedMessages(
-    authContext: AuthContext,
+    authContext: GmailAuthContext,
     lastHistoryIdUsed: string,
+    historyEntries: gmail_v1.Schema$History[],
+    responseHistoryId: string | null,
     envelopeSummary: EnvelopeSummary,
   ) {
-    await this.gmailSyncStateService.saveLastHistoryId(authContext.userEmail, authContext.historyId);
-    const response = { status: 'ok' as const };
+    const latestHistoryId = responseHistoryId
+      ?? this.gmailMessageParser.getLatestHistoryId(historyEntries)
+      ?? authContext.historyId;
+    await this.gmailSyncStateService.saveLastHistoryId(authContext.userEmail, latestHistoryId);
+    const response = { status: 'ok' };
     this.logger.log(
       `Processed Pub/Sub push: ${JSON.stringify({
         ...envelopeSummary,
-        historyId: authContext.historyId,
+        historyId: latestHistoryId,
         lastHistoryIdUsed,
         status: response.status,
       })}`,
     );
+
     return response;
   }
 

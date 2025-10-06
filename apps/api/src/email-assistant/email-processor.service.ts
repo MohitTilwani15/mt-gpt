@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { gmail } from '@googleapis/gmail';
+import type { gmail_v1 } from '@googleapis/gmail';
 
 import { EmailAssistantQueryService } from 'src/database/queries/email-assistant.query';
 
@@ -7,12 +7,12 @@ import { EmailAssistantQueryService } from 'src/database/queries/email-assistant
 export class EmailProcessorService {
   constructor(private readonly emailAssistantQuery: EmailAssistantQueryService) {}
 
-  async saveInboundMessage(message: any, gmailClient: ReturnType<typeof gmail>) {
+  async saveInboundMessage(message: any, gmailClient: gmail_v1.Gmail): Promise<boolean> {
     const headers = Object.fromEntries(message.payload.headers.map(h => [h.name, h.value]));
     const body = this.extractPlainText(message.payload);
     const attachments = await this.extractAttachments(message, gmailClient);
 
-    await this.emailAssistantQuery.saveInboundMessage({
+    return this.emailAssistantQuery.saveInboundMessage({
       id: message.id,
       threadId: message.threadId,
       fromEmail: headers['From'] ?? null,
@@ -44,7 +44,7 @@ export class EmailProcessorService {
     return Buffer.from(payload.body?.data || '', 'base64').toString('utf8');
   }
 
-  private async extractAttachments(message: any, gmailClient: any) {
+  private async extractAttachments(message: any, gmailClient: gmail_v1.Gmail) {
     const attachments = [];
     const parts = message.payload.parts || [];
     for (const part of parts) {

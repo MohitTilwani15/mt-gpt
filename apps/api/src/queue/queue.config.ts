@@ -1,7 +1,7 @@
 import { RegisterQueueAsyncOptions } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
-import { DOCUMENT_PROCESSING_QUEUE, EMAIL_REPLY_QUEUE } from './queue.constants';
+import { CONTRACT_REVIEW_QUEUE, DOCUMENT_PROCESSING_QUEUE, EMAIL_REPLY_QUEUE } from './queue.constants';
 
 export const buildConnection = (config: ConfigService) => {
   const redisUrl = config.get<string>('REDIS_URL');
@@ -54,6 +54,22 @@ export const queueAsyncRegistrations: RegisterQueueAsyncOptions[] = [
           delay: 30_000,
         },
         removeOnComplete: 100,
+      },
+    }),
+  },
+  {
+    name: CONTRACT_REVIEW_QUEUE,
+    imports: [ConfigModule],
+    inject: [ConfigService],
+    useFactory: (config: ConfigService) => ({
+      connection: buildConnection(config),
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 60_000,
+        },
+        removeOnComplete: 200,
       },
     }),
   },

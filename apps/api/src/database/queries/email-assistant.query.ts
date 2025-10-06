@@ -63,7 +63,7 @@ export class EmailAssistantQueryService {
       });
   }
 
-  async saveInboundMessage(params: SaveInboundMessageParams): Promise<void> {
+  async saveInboundMessage(params: SaveInboundMessageParams): Promise<boolean> {
     const {
       id,
       threadId = null,
@@ -76,8 +76,8 @@ export class EmailAssistantQueryService {
       attachments,
     } = params;
 
-    await this.db.transaction(async (tx) => {
-      await tx
+    return this.db.transaction(async (tx) => {
+      const inserted = await tx
         .insert(emailMessages)
         .values({
           id,
@@ -91,20 +91,25 @@ export class EmailAssistantQueryService {
           receivedAt,
           direction: 'inbound',
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: emailMessages.id });
 
-      if (!attachments.length) {
-        return;
+      if (!inserted.length) {
+        return false;
       }
 
-      const attachmentValues = attachments.map((attachment) => ({
-        messageId: id,
-        filename: attachment.filename,
-        mimeType: attachment.mimeType,
-        data: attachment.data,
-      }));
+      if (attachments.length) {
+        const attachmentValues = attachments.map((attachment) => ({
+          messageId: id,
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          data: attachment.data,
+        }));
 
-      await tx.insert(emailAttachments).values(attachmentValues);
+        await tx.insert(emailAttachments).values(attachmentValues);
+      }
+
+      return true;
     });
   }
 
@@ -148,5 +153,19 @@ export class EmailAssistantQueryService {
 
       await tx.insert(emailAttachments).values(attachmentValues);
     });
+  }
+
+  async getMessageAttachments(messageId: string) {
+    const rows = await this.db
+      .select({
+        id: emailAttachments.id,
+        filename: emailAttachments.filename,
+        mimeType: emailAttachments.mimeType,
+        data: emailAttachments.data,
+      })
+      .from(emailAttachments)
+      .where(eq(emailAttachments.messageId, messageId));
+
+    return rows;
   }
 }
