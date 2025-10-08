@@ -1,14 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Paragraph, TextRun, Document, Packer } from 'docx';
 import { openai } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
 import { extractText, getDocumentProxy } from 'unpdf';
 import * as mammoth from 'mammoth';
+import { z } from 'zod';
 
 import { EmailAssistantQueryService } from 'src/database/queries/email-assistant.query';
 import { ContractReviewJobPayload } from 'src/queue/jobs';
 import { ChatModel } from 'src/chat/dto/chat.dto';
+import { LlmContractReviewService } from './llm-contract-review.service';
+import { DocxRedlineService } from './docx-redline.service';
 
 interface ContractReviewResult {
   summary: string;
@@ -26,6 +28,8 @@ export class ContractReviewService {
   constructor(
     private readonly emailAssistantQuery: EmailAssistantQueryService,
     private readonly configService: ConfigService,
+    private readonly llmContractReviewService: LlmContractReviewService,
+    private readonly docxRedlineService: DocxRedlineService,
   ) {}
 
   async reviewContract(payload: ContractReviewJobPayload): Promise<ContractReviewResult | null> {
@@ -42,75 +46,31 @@ export class ContractReviewService {
 
     const classifiedType = await this.determineContractType(extractedText ?? '', payload.contractType);
 
-    const summaryLines = [
-      `Automated ${classifiedType.toUpperCase()} review for message ${payload.messageId}.`,
-      `Sender: ${payload.senderEmail}`,
-      `Subject: ${payload.subject}`,
-      `Primary document: ${primaryAttachment.filename ?? 'unknown'}.`,
-      '',
-      'Placeholder feedback:',
-      '- Differences identified compared to the company template should be reviewed manually.',
-      '- Clauses requiring legal attention will be highlighted here in future iterations.',
-      '- This automated response is for testing purposes only.',
-    ];
-
-    const summary = summaryLines.join('\n');
-
-    const docBuffer = await this.generatePlaceholderDoc({
-      summaryLines,
-      attachmentName: primaryAttachment.filename ?? 'contract',
+    const llmReview = await this.llmContractReviewService.compareWithStandard({
       contractType: classifiedType,
+      incomingMessageId: payload.messageId,
     });
 
-    return {
-      summary,
-      attachment: {
-        filename: `Review-${classifiedType}-${Date.now()}.docx`,
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        data: docBuffer.toString('base64'),
-      },
-    };
-  }
-
-  private async generatePlaceholderDoc(params: {
-    summaryLines: string[];
-    attachmentName: string;
-    contractType: ContractReviewJobPayload['contractType'];
-  }) {
-    const { summaryLines, attachmentName, contractType } = params;
-
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Automated ${contractType.toUpperCase()} Review`,
-                  bold: true,
-                  size: 28,
-                }),
-              ],
-            }),
-            new Paragraph({
-              spacing: { after: 200 },
-              children: [
-                new TextRun({ text: `Reviewed document: ${attachmentName}`, italics: true }),
-              ],
-            }),
-            ...summaryLines.map(
-              (line) =>
-                new Paragraph({
-                  children: [new TextRun({ text: line, size: 24 })],
-                }),
-            ),
-          ],
+    if (llmReview) {
+      const attachment = await this.docxRedlineService.buildAttachment({
+        review: llmReview,
+        metadata: {
+          contractType: classifiedType,
+          messageId: payload.messageId,
+          subject: payload.subject,
         },
-      ],
-    });
+      });
 
-    const buffer = await Packer.toBuffer(doc);
-    return Buffer.from(buffer);
+      return {
+        summary: llmReview.summary,
+        attachment,
+      };
+    }
+
+    this.logger.warn(
+      `LLM contract review produced no result for message ${payload.messageId}; skipping response generation.`,
+    );
+    return null;
   }
 
   private async extractTextFromAttachment(buffer: Buffer, mimeType: string): Promise<string | null> {
@@ -121,7 +81,11 @@ export class ContractReviewService {
         return text ?? null;
       }
 
-      if (mimeType?.includes('wordprocessingml.document') || mimeType?.includes('application/vnd.openxmlformats-officedocument')) {
+      if (
+        mimeType?.includes('wordprocessingml.document') ||
+        mimeType?.includes('application/vnd.openxmlformats-officedocument') ||
+        mimeType === 'application/msword'
+      ) {
         const result = await mammoth.extractRawText({ buffer });
         return result.value ?? null;
       }
@@ -145,20 +109,25 @@ export class ContractReviewService {
     const trimmed = text.slice(0, 6000);
     try {
       const modelName = this.configService.get<string>('CONTRACT_CLASSIFIER_MODEL') ?? ChatModel.GPT_5_NANO;
-      const response = await generateText({
+      const schema = z.object({
+        contractType: z.enum(['nda', 'dpa', 'unknown']).default('unknown'),
+      });
+
+      const { object } = await generateObject({
         model: openai(modelName),
-        prompt: `Classify the following contract as "nda", "dpa", or "unknown".
-Return only one word: nda, dpa, or unknown.
+        schema,
+        prompt: `Classify the following contract as one of: nda, dpa, unknown.
+Respond only with the JSON field "contractType".
 
 Contract text:
 ${trimmed}`,
         temperature: 0,
+        maxOutputTokens: 200,
       });
 
-      const prediction = response.text.trim().toLowerCase();
-      if (prediction.includes('dpa')) return 'dpa';
-      if (prediction.includes('nda')) return 'nda';
-      if (prediction.includes('unknown')) return 'unknown';
+      if (object?.contractType) {
+        return object.contractType;
+      }
     } catch (error) {
       this.logger.warn(`Contract classification failed: ${(error as Error)?.message ?? error}`);
     }

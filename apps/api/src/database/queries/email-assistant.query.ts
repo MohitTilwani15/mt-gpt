@@ -168,4 +168,5 @@ export class EmailAssistantQueryService {
 
     return rows;
   }
+
 }
