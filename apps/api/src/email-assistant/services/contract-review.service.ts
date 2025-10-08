@@ -13,7 +13,7 @@ import { LlmContractReviewService } from './llm-contract-review.service';
 import { DocxRedlineService } from './docx-redline.service';
 
 interface ContractReviewResult {
-  summary: string;
+  summary: string[];
   attachment?: {
     filename: string;
     mimeType: string;
@@ -44,7 +44,7 @@ export class ContractReviewService {
     const buffer = Buffer.from(primaryAttachment.data, 'base64');
     const extractedText = await this.extractTextFromAttachment(buffer, primaryAttachment.mimeType ?? '');
 
-    const classifiedType = await this.determineContractType(extractedText ?? '', payload.contractType);
+    const classifiedType = await this.determineContractType(extractedText ?? '', 'unknown');
 
     const llmReview = await this.llmContractReviewService.compareWithStandard({
       contractType: classifiedType,
@@ -52,18 +52,18 @@ export class ContractReviewService {
     });
 
     if (llmReview) {
-      const attachment = await this.docxRedlineService.buildAttachment({
-        review: llmReview,
-        metadata: {
-          contractType: classifiedType,
-          messageId: payload.messageId,
-          subject: payload.subject,
-        },
-      });
+      // const attachment = await this.docxRedlineService.buildAttachment({
+      //   review: llmReview,
+      //   metadata: {
+      //     contractType: classifiedType,
+      //     messageId: payload.messageId,
+      //     subject: payload.subject,
+      //   },
+      // });
 
       return {
         summary: llmReview.summary,
-        attachment,
+        // attachment,
       };
     }
 
@@ -101,14 +101,14 @@ export class ContractReviewService {
     }
   }
 
-  private async determineContractType(text: string, fallback: ContractReviewJobPayload['contractType']) {
+  private async determineContractType(text: string, fallback: 'nda' | 'dpa' | 'unknown') {
     if (!text || text.trim().length === 0) {
       return fallback;
     }
 
     const trimmed = text.slice(0, 6000);
     try {
-      const modelName = this.configService.get<string>('CONTRACT_CLASSIFIER_MODEL') ?? ChatModel.GPT_5_NANO;
+      const modelName = this.configService.get<string>('CONTRACT_CLASSIFIER_MODEL') ?? ChatModel.GPT_5;
       const schema = z.object({
         contractType: z.enum(['nda', 'dpa', 'unknown']).default('unknown'),
       });
@@ -121,7 +121,6 @@ Respond only with the JSON field "contractType".
 
 Contract text:
 ${trimmed}`,
-        temperature: 0,
         maxOutputTokens: 200,
       });
 

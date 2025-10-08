@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { z } from 'zod';
 
 import { ContractTemplateService } from '../services/contract-template.service';
-import { ParseDocxService } from '../services/parse-docx-service';
+import { ContractTextExtractionService } from '../services/contract-text-extraction.service';
 import { CloudflareR2Service } from 'src/services/cloudflare-r2.service';
 
 const ALLOWED_CONTRACT_TYPES = ['nda', 'dpa'] as const;
@@ -37,7 +37,7 @@ type UploadTemplateResponse = {
 export class ContractTemplateController {
   constructor(
     private readonly templateService: ContractTemplateService,
-    private readonly parseDocxService: ParseDocxService,
+    private readonly parseDocxService: ContractTextExtractionService,
     private readonly r2Service: CloudflareR2Service,
   ) {}
 
@@ -59,7 +59,7 @@ export class ContractTemplateController {
     const payload: UploadTemplatePayload = parsed.data;
 
     const upload = await this.r2Service.uploadFile({ file });
-    const extractedHtml = await this.parseDocxService.parseDocx(file.buffer);
+    const extractedHtml = await this.parseDocxService.parseDocxToHtml(file.buffer);
 
     const template = await this.templateService.createTemplate({
       contractType: payload.contractType,

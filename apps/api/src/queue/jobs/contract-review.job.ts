@@ -4,5 +4,4 @@ export interface ContractReviewJobPayload {
   senderEmail: string;
   subject: string;
   threadId?: string | null;
-  contractType: 'nda' | 'dpa' | 'unknown';
 }

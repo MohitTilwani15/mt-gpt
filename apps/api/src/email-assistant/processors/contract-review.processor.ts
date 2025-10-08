@@ -31,13 +31,17 @@ export class ContractReviewProcessor extends WorkerHost {
       return;
     }
 
+    const summaryBody = result.summary.length
+      ? result.summary.map((line) => `• ${line}`).join('\n')
+      : 'No summary available for this review.';
+
     await this.jobQueueService.enqueueEmailReply({
       userEmail: 'mohit@alphalink.xyz', // TODO: replace with actual user email
       messageId: job.data.messageId,
       threadId: job.data.threadId,
       toEmail: 'mohit@alphalink.xyz', // TODO: replace with actual recipient email
       subject: `Review feedback: ${job.data.subject}`, // TODO: improve subject
-      body: result.summary,
+      body: summaryBody,
       attachments: result.attachment
         ? [result.attachment]
         : undefined,

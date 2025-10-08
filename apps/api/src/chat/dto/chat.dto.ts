@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { UIMessage } from 'ai';
 
 export enum ChatModel {
+  GPT_5 = 'gpt-5',
   GPT_5_NANO = 'gpt-5-nano',
   GPT_4O = 'gpt-4o',
   // CLAUDE_3_5_SONNET = 'claude-3-5-sonnet-20241022',
@@ -14,6 +15,7 @@ export enum ChatModel {
 }
 
 export const CHAT_MODEL_NAMES: Record<ChatModel, string> = {
+  [ChatModel.GPT_5]: 'GPT-5',
   [ChatModel.GPT_5_NANO]: 'GPT-5 Nano',
   [ChatModel.GPT_4O]: 'GPT-4o',
   // [ChatModel.CLAUDE_3_5_SONNET]: 'Claude 3.5 Sonnet',
@@ -25,6 +27,7 @@ export const CHAT_MODEL_NAMES: Record<ChatModel, string> = {
 };
 
 export const CHAT_MODEL_SUPPORTS_REASONING: Record<ChatModel, boolean> = {
+  [ChatModel.GPT_5]: false,
   [ChatModel.GPT_5_NANO]: false,
   [ChatModel.GPT_4O]: false,
   [ChatModel.O4_MINI]: true,

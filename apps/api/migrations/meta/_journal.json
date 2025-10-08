@@ -71,6 +71,13 @@
       "when": 1759920910580,
       "tag": "0009_rainy_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1759934356984,
+      "tag": "0010_sweet_famine",
+      "breakpoints": true
     }
   ]
 }

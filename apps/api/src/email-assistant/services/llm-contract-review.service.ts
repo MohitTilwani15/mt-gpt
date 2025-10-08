@@ -4,19 +4,12 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
-import { ParseDocxService } from './parse-docx-service';
+import { ContractTextExtractionService } from './contract-text-extraction.service';
 import { ChatModel } from 'src/chat/dto/chat.dto';
-import { ContractTemplateService } from './contract-template.service';
+import { ContractPlaybookService } from './contract-playbook.service';
 
 export interface LlmContractReviewResult {
-  summary: string;
-  htmlDiff: string;
-  issues: Array<{
-    title: string;
-    severity: 'low' | 'medium' | 'high';
-    detail: string;
-    recommendation: string;
-  }>;
+  summary: string[];
 }
 
 @Injectable()
@@ -24,8 +17,8 @@ export class LlmContractReviewService {
   private readonly logger = new Logger(LlmContractReviewService.name);
 
   constructor(
-    private readonly parseDocxService: ParseDocxService,
-    private readonly contractTemplateService: ContractTemplateService,
+    private readonly parseDocxService: ContractTextExtractionService,
+    private readonly contractPlaybookService: ContractPlaybookService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -33,91 +26,86 @@ export class LlmContractReviewService {
     contractType: 'nda' | 'dpa' | 'unknown';
     incomingMessageId: string;
   }): Promise<LlmContractReviewResult | null> {
-    const templateRecord = await this.contractTemplateService.getActiveTemplate(params.contractType);
-    if (!templateRecord) {
-      this.logger.warn(`No template configured for contract type ${params.contractType}.`);
+    const playbookRecord = await this.contractPlaybookService.getActivePlaybook(params.contractType);
+    if (!playbookRecord) {
+      this.logger.warn(`No playbook configured for contract type ${params.contractType}.`);
       return null;
     }
 
-    const [incomingHtml] = await Promise.all([
-      this.parseDocxService.parseMessageDocx(params.incomingMessageId),
+    const [incomingText] = await Promise.all([
+      this.parseDocxService.parseMessageDocxText(params.incomingMessageId),
     ]);
 
-    const standardHtml = templateRecord.extractedHtml;
-
-    if (!standardHtml) {
-      this.logger.warn(`Failed to load standard template HTML for contract type ${params.contractType}.`);
-      return null;
-    }
-
-    if (!incomingHtml) {
-      this.logger.warn(`Failed to load incoming contract HTML for message ${params.incomingMessageId}.`);
+    if (!incomingText) {
+      this.logger.warn(`Failed to load incoming contract text for message ${params.incomingMessageId}.`);
       return null;
     }
 
     const modelName = this.configService.get<string>('CONTRACT_REVIEW_MODEL') ?? ChatModel.GPT_5_NANO;
 
-    const prompt = this.buildComparisonPrompt({
+    const prompt = this.buildPlaybookPrompt({
       contractType: params.contractType,
-      standardHtml,
-      incomingHtml,
+      playbookMarkdown: playbookRecord.content,
+      incomingText,
     });
 
     try {
       const schema = z.object({
-        summary: z.string(),
-        htmlDiff: z.string().default(''),
-        issues: z
-          .array(
-            z.object({
-              title: z.string().default('Issue'),
-              severity: z.enum(['low', 'medium', 'high']).default('low'),
-              detail: z.string().default(''),
-              recommendation: z.string().default(''),
-            }),
-          )
-          .default([]),
+        summary: z.union([z.string(), z.array(z.string())]).optional()
       });
 
       const { object } = await generateObject({
         model: openai(modelName),
         schema,
         prompt,
-        maxOutputTokens: 2000,
       });
 
-      return object;
+      const summary = this.normalizeSummary(object.summary);
+
+      return {
+        summary,
+      };
     } catch (error) {
       this.logger.error(`LLM contract review failed: ${(error as Error)?.message ?? error}`);
       return null;
     }
   }
 
-  private buildComparisonPrompt(params: {
+  private buildPlaybookPrompt(params: {
     contractType: string;
-    standardHtml: string;
-    incomingHtml: string;
+    playbookMarkdown: string;
+    incomingText: string;
   }) {
-    return `You are a senior contracts attorney. Compare the company's standard ${params.contractType.toUpperCase()} template to the received contract.
+    const truncatedContract = params.incomingText.slice(0, 15000);
+
+    return `You are a senior contracts attorney. Review the provided ${params.contractType.toUpperCase()} contract against the playbook guidance below. Highlight deviations, missing protections, and risky language relative to the playbook expectations. Focus on producing a concise summary.
 Produce a JSON response with the following shape:
 {
-  "summary": string,
-  "issues": [
-    {
-      "title": string,
-      "severity": "low" | "medium" | "high",
-      "detail": string,
-      "recommendation": string
-    }
-  ],
-  "htmlDiff": string // HTML diff using <del> for removals and <ins> for insertions
+  "summary": string[], // concise bullet points summarizing key findings
 }
-Focus on material deviations, missing clauses, or riskier language. Keep the diff concise but accurate.
+Focus on the most material gaps between the contract and the playbook. Keep the diff concise but ensure it cleanly applies to the provided contract text (if provided).
 
-Standard template HTML:
-${params.standardHtml}
+Playbook (Markdown):
+${params.playbookMarkdown}
 
-Received contract HTML:
-${params.incomingHtml}`;
+Received contract text:
+${truncatedContract}`;
+  }
+
+  private normalizeSummary(raw: unknown): string[] {
+    if (Array.isArray(raw)) {
+      return raw
+        .map((line) => (typeof line === 'string' ? line.trim() : ''))
+        .filter((line) => line.length > 0);
+    }
+
+    if (typeof raw === 'string' && raw.trim()) {
+      return raw
+        .split(/\r?\n+/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+    }
+
+    return [];
   }
 }

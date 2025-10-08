@@ -59,48 +59,49 @@ export class EmailAssistantService {
     let authContext: GmailAuthContext | null = null;
     let tokenPayload: TokenPayload | null = null;
 
-    await this.enqueueManualContractReviewTest();
+    // await this.enqueueManualContractReviewTest();
 
-    // try {
-    //   this.logger.debug(`Received Pub/Sub push: ${JSON.stringify(envelopeSummary)}`);
+    try {
+      this.logger.debug(`Received Pub/Sub push: ${JSON.stringify(envelopeSummary)}`);
 
-    //   // tokenPayload = await this.verifyPubSubAuthorization(authorizationHeader);
-    //   // envelopeSummary.tokenEmail = tokenPayload.email ?? undefined;
-    //   // envelopeSummary.tokenSub = tokenPayload.sub;
-    //   // envelopeSummary.tokenIssuer = tokenPayload.iss;
+      // TODO: re-enable auth once we have proper setup
+      // tokenPayload = await this.verifyPubSubAuthorization(authorizationHeader);
+      // envelopeSummary.tokenEmail = tokenPayload.email ?? undefined;
+      // envelopeSummary.tokenSub = tokenPayload.sub;
+      // envelopeSummary.tokenIssuer = tokenPayload.iss;
 
-    //   decoded = this.decodePubSubMessage(body);
-    //   authContext = this.gmailAuthService.createContext(decoded.emailAddress, decoded.historyId);
+      decoded = this.decodePubSubMessage(body);
+      authContext = this.gmailAuthService.createContext(decoded.emailAddress, decoded.historyId);
 
-    //   const { historyEntries, lastHistoryIdUsed, responseHistoryId } = await this.fetchHistory(authContext);
-    //   const addedMessages = this.gmailMessageParser.extractAddedMessages(historyEntries);
+      const { historyEntries, lastHistoryIdUsed, responseHistoryId } = await this.fetchHistory(authContext);
+      const addedMessages = this.gmailMessageParser.extractAddedMessages(historyEntries);
 
-    //   if (!addedMessages.length) {
-    //     return this.handleNoNewMessages(authContext, envelopeSummary, responseHistoryId);
-    //   }
+      if (!addedMessages.length) {
+        return this.handleNoNewMessages(authContext, envelopeSummary, responseHistoryId);
+      }
 
-    //   await this.processAddedMessages(authContext, addedMessages);
+      await this.processAddedMessages(authContext, addedMessages);
 
-    //   return this.handleProcessedMessages(
-    //     authContext,
-    //     lastHistoryIdUsed,
-    //     historyEntries,
-    //     responseHistoryId,
-    //     envelopeSummary,
-    //   );
-    // } catch (err) {
-    //   const error = err instanceof Error ? err : new Error(String(err));
-    //   this.logger.error(`Email-assistant error: ${error.message}`, error.stack);
-    //   this.logger.error(
-    //     `Email-assistant error context: ${JSON.stringify({
-    //       ...envelopeSummary,
-    //       historyId: authContext?.historyId,
-    //       decoded,
-    //       tokenSub: tokenPayload?.sub,
-    //     })}`,
-    //   );
-    //   throw err;
-    // }
+      return this.handleProcessedMessages(
+        authContext,
+        lastHistoryIdUsed,
+        historyEntries,
+        responseHistoryId,
+        envelopeSummary,
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error(`Email-assistant error: ${error.message}`, error.stack);
+      this.logger.error(
+        `Email-assistant error context: ${JSON.stringify({
+          ...envelopeSummary,
+          historyId: authContext?.historyId,
+          decoded,
+          tokenSub: tokenPayload?.sub,
+        })}`,
+      );
+      throw err;
+    }
   }
 
   private buildEnvelopeSummary(body: PubSubPushBody): EnvelopeSummary {
@@ -184,7 +185,6 @@ export class EmailAssistantService {
           senderEmail,
           subject,
           threadId: msg.data.threadId,
-          contractType: 'unknown',
         })
         .catch((error) =>
           this.logger.error(
@@ -289,16 +289,15 @@ export class EmailAssistantService {
     try {
       await this.jobQueueService
         .enqueueContractReview({
-          messageId: '199bb0b7c4502071',
+          messageId: '199c46921de07e5a',
           userEmail: 'test@company.com',
           senderEmail: 'sender@example.com',
           subject: 'Manual contract review trigger',
           threadId: null,
-          contractType: 'unknown',
         })
         .then((job) =>
           this.logger.debug(
-            `Manually enqueued contract review test job ${job.id} for message 199bb0b7c4502071.`,
+            `Manually enqueued contract review test job ${job.id} for message 199c46921de07e5a.`,
           ),
         )
         .catch((error) =>

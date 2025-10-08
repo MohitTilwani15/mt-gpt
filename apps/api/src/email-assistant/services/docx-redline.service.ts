@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
+import { DeletedTextRun, Document, InsertedTextRun, Packer, Paragraph, TextRun, type ParagraphChild } from 'docx';
 import { NodeType, parse, type HTMLElement, type Node as HtmlNode, type TextNode } from 'node-html-parser';
 
 import type { LlmContractReviewResult } from './llm-contract-review.service';
@@ -27,6 +27,8 @@ export interface RedlineAttachment {
 
 @Injectable()
 export class DocxRedlineService {
+  private revisionIdCounter = 1;
+
   async buildAttachment(params: BuildRedlineDocParams): Promise<RedlineAttachment> {
     const buffer = await this.buildDocumentBuffer(params);
     const filename = params.filename ?? this.buildFilename(params.metadata);
@@ -40,156 +42,32 @@ export class DocxRedlineService {
 
   async buildDocumentBuffer(params: BuildRedlineDocParams): Promise<Buffer> {
     const { review, metadata } = params;
-    const generatedAt = metadata?.generatedAt ?? new Date();
+    const revisionAuthor =
+      metadata?.contractType?.trim() && metadata.contractType.length <= 32
+        ? `AI Review (${metadata.contractType.toUpperCase()})`
+        : 'AI Contract Reviewer';
+    const revisionDate = (metadata?.generatedAt ?? new Date()).toISOString();
 
-    const children: Paragraph[] = [
-      new Paragraph({
-        text: 'Contract Review Report',
-        heading: HeadingLevel.TITLE,
-        spacing: { after: 200 },
-      }),
-    ];
+    this.revisionIdCounter = 1;
 
-    if (metadata?.subject) {
-      children.push(
-        new Paragraph({
-          text: `Subject: ${metadata.subject}`,
-          spacing: { after: 120 },
-        }),
-      );
-    }
-
-    if (metadata?.contractType) {
-      children.push(
-        new Paragraph({
-          text: `Contract type: ${metadata.contractType.toUpperCase()}`,
-          spacing: { after: 120 },
-        }),
-      );
-    }
-
-    if (metadata?.messageId) {
-      children.push(
-        new Paragraph({
-          text: `Message ID: ${metadata.messageId}`,
-          spacing: { after: 120 },
-        }),
-      );
-    }
-
-    children.push(
-      new Paragraph({
-        text: `Generated at: ${generatedAt.toISOString()}`,
-        spacing: { after: 240 },
-      }),
-    );
-
-    children.push(
-      new Paragraph({
-        text: 'Summary',
-        heading: HeadingLevel.HEADING_2,
-        spacing: { after: 120 },
-      }),
-    );
-
-    if (review.summary?.trim()) {
-      for (const line of this.splitLines(review.summary)) {
-        children.push(
+    const diffParagraphs = this.buildDiffParagraphs(review.summary[0] ?? '', revisionAuthor, revisionDate); // TODO fix it
+    const children = diffParagraphs.length
+      ? diffParagraphs
+      : [
           new Paragraph({
-            children: [new TextRun({ text: line })],
-            spacing: { after: 120 },
-          }),
-        );
-      }
-    } else {
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'No summary provided.',
-              italics: true,
-            }),
-          ],
-          spacing: { after: 120 },
-        }),
-      );
-    }
-
-    children.push(
-      new Paragraph({
-        text: 'Identified Issues',
-        heading: HeadingLevel.HEADING_2,
-        spacing: { after: 120 },
-      }),
-    );
-
-    if (review.issues?.length) {
-      for (const issue of review.issues) {
-        const headerParts = [
-          issue.title?.trim() || 'Issue',
-          issue.severity ? `(${issue.severity.toUpperCase()})` : null,
-        ].filter(Boolean);
-
-        children.push(
-          new Paragraph({
-            text: headerParts.join(' '),
-            bullet: { level: 0 },
-            spacing: { after: 60 },
-          }),
-        );
-
-        const detailText = [issue.detail, issue.recommendation].filter((part) => part?.trim()).join('\n\n');
-        if (detailText) {
-          for (const detailLine of this.splitLines(detailText)) {
-            children.push(
-              new Paragraph({
-                children: [new TextRun({ text: detailLine })],
-                spacing: { after: 60 },
-                indent: { left: 720 },
+            children: [
+              new TextRun({
+                text: 'No tracked changes generated for this document.',
+                italics: true,
               }),
-            );
-          }
-        }
-      }
-    } else {
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'No issues were highlighted by the automated review.',
-              italics: true,
-            }),
-          ],
-          spacing: { after: 120 },
-        }),
-      );
-    }
-
-    children.push(
-      new Paragraph({
-        text: 'AI Redline Diff',
-        heading: HeadingLevel.HEADING_2,
-        spacing: { after: 120 },
-      }),
-    );
-
-    const diffParagraphs = this.buildDiffParagraphs(review.htmlDiff ?? '');
-    if (diffParagraphs.length) {
-      children.push(...diffParagraphs);
-    } else {
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'No diff content available.',
-              italics: true,
-            }),
-          ],
-        }),
-      );
-    }
+            ],
+          }),
+        ];
 
     const doc = new Document({
+      features: {
+        trackRevisions: true,
+      },
       sections: [
         {
           children,
@@ -211,18 +89,11 @@ export class DocxRedlineService {
     return `Contract-Review-${this.sanitizeFilenamePart(type)}-${timestamp}.docx`;
   }
 
-  private splitLines(text: string): string[] {
-    return text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-  }
-
   private sanitizeFilenamePart(part: string): string {
     return part.replace(/[^a-z0-9-_]+/gi, '_');
   }
 
-  private buildDiffParagraphs(htmlDiff: string): Paragraph[] {
+  private buildDiffParagraphs(htmlDiff: string, author: string, revisionDate: string): Paragraph[] {
     const normalized = this.normalizeDiffHtml(htmlDiff);
     if (!normalized.trim()) {
       return [];
@@ -238,7 +109,7 @@ export class DocxRedlineService {
     for (const paragraph of paragraphs) {
       const isBullet = /^-\s+/.test(paragraph);
       const paragraphContent = isBullet ? paragraph.replace(/^-\s+/, '') : paragraph;
-      const runs = this.buildDiffRuns(paragraphContent);
+      const runs = this.buildDiffRuns(paragraphContent, author, revisionDate);
       if (!runs.length) {
         continue;
       }
@@ -254,8 +125,8 @@ export class DocxRedlineService {
     return docxParagraphs;
   }
 
-  private buildDiffRuns(paragraph: string): TextRun[] {
-    const runs: TextRun[] = [];
+  private buildDiffRuns(paragraph: string, author: string, revisionDate: string): ParagraphChild[] {
+    const runs: ParagraphChild[] = [];
     let buffer = '';
     let mode: DiffMode = 'normal';
     let index = 0;
@@ -271,14 +142,20 @@ export class DocxRedlineService {
         const parts = text.split('\n');
         parts.forEach((part, idx) => {
           if (part) {
-            runs.push(this.createTextRun(part, mode));
+            const run = this.createTrackedRun(part, mode, author, revisionDate);
+            if (run) {
+              runs.push(run);
+            }
           }
           if (idx < parts.length - 1) {
             runs.push(new TextRun({ break: 1 }));
           }
         });
       } else {
-        runs.push(this.createTextRun(text, mode));
+        const run = this.createTrackedRun(text, mode, author, revisionDate);
+        if (run) {
+          runs.push(run);
+        }
       }
     };
 
@@ -321,24 +198,37 @@ export class DocxRedlineService {
     return runs;
   }
 
-  private createTextRun(text: string, mode: DiffMode): TextRun {
+  private createTrackedRun(text: string, mode: DiffMode, author: string, revisionDate: string): ParagraphChild | null {
+    const normalized = text.replace(/\s+/g, (match) => (match.includes('\n') ? match : ' '));
+    if (!normalized.trim()) {
+      return null;
+    }
+
+    const id = this.nextRevisionId();
+
     if (mode === 'insert') {
-      return new TextRun({
-        text,
-        color: '006100',
-        bold: true,
+      return new InsertedTextRun({
+        text: normalized,
+        author,
+        date: revisionDate,
+        id,
       });
     }
 
     if (mode === 'delete') {
-      return new TextRun({
-        text,
-        color: 'C00000',
-        strike: true,
+      return new DeletedTextRun({
+        text: normalized,
+        author,
+        date: revisionDate,
+        id,
       });
     }
 
-    return new TextRun({ text });
+    return new TextRun({ text: normalized });
+  }
+
+  private nextRevisionId(): number {
+    return this.revisionIdCounter++;
   }
 
   private normalizeDiffHtml(html: string): string {

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ContractTemplateQueryService } from 'src/database/queries/contract-template.query';
-import { ParseDocxService } from './parse-docx-service';
+import { ContractTextExtractionService } from './contract-text-extraction.service';
 
 export interface ContractTemplateRecord {
   id: string;
@@ -19,7 +19,7 @@ export class ContractTemplateService {
 
   constructor(
     private readonly contractTemplateQuery: ContractTemplateQueryService,
-    private readonly parseDocxService: ParseDocxService,
+    private readonly parseDocxService: ContractTextExtractionService,
   ) {}
 
   async createTemplate(params: {
