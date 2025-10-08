@@ -83,7 +83,6 @@ export class LlmContractReviewService {
         model: openai(modelName),
         schema,
         prompt,
-        temperature: 0,
         maxOutputTokens: 2000,
       });
 

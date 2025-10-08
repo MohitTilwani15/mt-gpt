@@ -32,11 +32,11 @@ export class ContractReviewProcessor extends WorkerHost {
     }
 
     await this.jobQueueService.enqueueEmailReply({
-      userEmail: 'mohit@alphalink.xyz',
+      userEmail: 'mohit@alphalink.xyz', // TODO: replace with actual user email
       messageId: job.data.messageId,
       threadId: job.data.threadId,
-      toEmail: 'mohit@alphalink.xyz',
-      subject: `Review feedback: ${job.data.subject}`,
+      toEmail: 'mohit@alphalink.xyz', // TODO: replace with actual recipient email
+      subject: `Review feedback: ${job.data.subject}`, // TODO: improve subject
       body: result.summary,
       attachments: result.attachment
         ? [result.attachment]
