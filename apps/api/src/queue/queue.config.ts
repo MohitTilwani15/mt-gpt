@@ -1,76 +1,32 @@
-import { RegisterQueueAsyncOptions } from '@nestjs/bullmq';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
-import { CONTRACT_REVIEW_QUEUE, DOCUMENT_PROCESSING_QUEUE, EMAIL_REPLY_QUEUE } from './queue.constants';
+import {
+  CONTRACT_REVIEW_QUEUE,
+  DOCUMENT_PROCESSING_QUEUE,
+  EMAIL_REPLY_QUEUE,
+  ServiceBusQueueNames,
+} from './queue.constants';
 
-export const buildConnection = (config: ConfigService) => {
-  const redisUrl = config.get<string>('REDIS_URL');
-  if (redisUrl) {
-    return { url: redisUrl };
-  }
+export interface ServiceBusConfiguration {
+  connectionString: string;
+  queueNames: ServiceBusQueueNames;
+}
 
-  const host = config.get<string>('REDIS_HOST') ?? '127.0.0.1';
-  const port = Number.parseInt(config.get<string>('REDIS_PORT') ?? '6379', 10);
-  const username = config.get<string>('REDIS_USERNAME');
-  const password = config.get<string>('REDIS_PASSWORD');
-  const useTls = config.get<string>('REDIS_TLS') === 'true';
+export const buildServiceBusConfiguration = (config: ConfigService): ServiceBusConfiguration => {
+  const connectionString = config.getOrThrow<string>('AZURE_SERVICE_BUS_CONNECTION_STRING');
 
   return {
-    host,
-    port,
-    username: username ?? undefined,
-    password: password ?? undefined,
-    tls: useTls ? {} : undefined,
+    connectionString,
+    queueNames: {
+      documentProcessing:
+        config.get<string>('AZURE_SERVICE_BUS_DOCUMENT_QUEUE') ??
+        DOCUMENT_PROCESSING_QUEUE,
+      emailReply:
+        config.get<string>('AZURE_SERVICE_BUS_EMAIL_QUEUE') ??
+        EMAIL_REPLY_QUEUE,
+      contractReview:
+        config.get<string>('AZURE_SERVICE_BUS_CONTRACT_QUEUE') ??
+        CONTRACT_REVIEW_QUEUE,
+    },
   };
 };
-
-export const queueAsyncRegistrations: RegisterQueueAsyncOptions[] = [
-  {
-    name: DOCUMENT_PROCESSING_QUEUE,
-    imports: [ConfigModule],
-    inject: [ConfigService],
-    useFactory: (config: ConfigService) => ({
-      connection: buildConnection(config),
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 15_000,
-        },
-        removeOnComplete: 100,
-      },
-    }),
-  },
-  {
-    name: EMAIL_REPLY_QUEUE,
-    imports: [ConfigModule],
-    inject: [ConfigService],
-    useFactory: (config: ConfigService) => ({
-      connection: buildConnection(config),
-      defaultJobOptions: {
-        attempts: 5,
-        backoff: {
-          type: 'exponential',
-          delay: 30_000,
-        },
-        removeOnComplete: 100,
-      },
-    }),
-  },
-  {
-    name: CONTRACT_REVIEW_QUEUE,
-    imports: [ConfigModule],
-    inject: [ConfigService],
-    useFactory: (config: ConfigService) => ({
-      connection: buildConnection(config),
-      defaultJobOptions: {
-        attempts: 5,
-        backoff: {
-          type: 'exponential',
-          delay: 60_000,
-        },
-        removeOnComplete: 200,
-      },
-    }),
-  },
-];

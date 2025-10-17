@@ -59,7 +59,7 @@ export class EmailAssistantService {
     let authContext: GmailAuthContext | null = null;
     let tokenPayload: TokenPayload | null = null;
 
-    // await this.enqueueManualContractReviewTest();
+    await this.enqueueManualContractReviewTest(); // TODO: remove this line after testing
 
     try {
       this.logger.debug(`Received Pub/Sub push: ${JSON.stringify(envelopeSummary)}`);
@@ -297,7 +297,7 @@ export class EmailAssistantService {
         })
         .then((job) =>
           this.logger.debug(
-            `Manually enqueued contract review test job ${job.id} for message 199c46921de07e5a.`,
+            `Manually enqueued contract review test job ${job} for message 199c46921de07e5a.`,
           ),
         )
         .catch((error) =>
