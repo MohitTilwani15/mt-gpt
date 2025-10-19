@@ -3,13 +3,9 @@ using DocumentRedlining.Data;
 using DocumentRedlining.Options;
 using DocumentRedlining.Services;
 
-if (File.Exists(Path.Combine(AppContext.BaseDirectory, ".env")))
+if (File.Exists(".env"))
 {
-    DotNetEnv.Env.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
-}
-else if (File.Exists(Path.Combine(Directory.GetCurrentDirectory(), ".env")))
-{
-    DotNetEnv.Env.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+    DotNetEnv.Env.Load();
 }
 
 var builder = Host.CreateApplicationBuilder(args);
