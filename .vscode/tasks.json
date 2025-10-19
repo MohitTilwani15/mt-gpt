@@ -94,6 +94,42 @@
         "focus": false,
         "panel": "new"
       }
+    },
+    {
+      "label": "Build Document Redlining",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/apps/DocumentRedlining/DocumentRedlining.csproj"
+      ],
+      "group": "build",
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Document Redlining",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/apps/DocumentRedlining/DocumentRedlining.csproj"
+      ],
+      "options": {
+        "env": {
+          "DOTNET_ENVIRONMENT": "Development"
+        }
+      },
+      "group": "build",
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     }
   ]
 }

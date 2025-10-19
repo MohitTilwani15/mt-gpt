@@ -59,12 +59,11 @@ export class EmailAssistantService {
     let authContext: GmailAuthContext | null = null;
     let tokenPayload: TokenPayload | null = null;
 
-    await this.enqueueManualContractReviewTest(); // TODO: remove this line after testing
+    // await this.enqueueManualContractReviewTest(); // TODO: remove this line after testing
 
     try {
       this.logger.debug(`Received Pub/Sub push: ${JSON.stringify(envelopeSummary)}`);
 
-      // TODO: re-enable auth once we have proper setup
       // tokenPayload = await this.verifyPubSubAuthorization(authorizationHeader);
       // envelopeSummary.tokenEmail = tokenPayload.email ?? undefined;
       // envelopeSummary.tokenSub = tokenPayload.sub;
@@ -143,10 +142,11 @@ export class EmailAssistantService {
 
   private async processAddedMessages(authContext: GmailAuthContext, addedMessages: HistoryMessageAdded[]) {
     for (const { message: { id } } of addedMessages) {
-      let msg;
+      let messageData: gmail_v1.Schema$Message | null = null;
 
       try {
-        msg = await authContext.client.users.messages.get({ userId: 'me', id, format: 'full' });
+        const response = await authContext.client.users.messages.get({ userId: 'me', id, format: 'full' });
+        messageData = response.data ?? null;
       } catch (error) {
         const status = (error as any)?.code ?? (error as any)?.response?.status;
         if (status === 404) {
@@ -156,35 +156,56 @@ export class EmailAssistantService {
         throw error;
       }
 
-      const isNewMessage = await this.emailProcessor.saveInboundMessage(msg.data, authContext.client);
+      if (!messageData) {
+        this.logger.warn(`Message ${id} returned no payload; skipping.`);
+        continue;
+      }
+
+      const isNewMessage = await this.emailProcessor.saveInboundMessage(messageData, authContext.client);
 
       if (!isNewMessage) {
         this.logger.debug(`Message ${id} already processed; skipping auto actions.`);
         continue;
       }
 
-      const headers = this.gmailMessageParser.extractHeaders(msg.data.payload?.headers);
+      const headers = this.gmailMessageParser.extractHeaders(messageData.payload?.headers);
       const senderEmail = this.gmailMessageParser.extractEmailAddress(headers.get('from'));
       const subject = headers.get('subject') ?? '(no subject)';
 
-      if (!senderEmail || this.isSameMailbox(senderEmail, authContext.userEmail)) {
-        this.logger.debug(`Skipping auto actions for message ${id}; sender email missing or same as mailbox.`);
+      if (!senderEmail) {
+        this.logger.debug(`Skipping auto actions for message ${id}; sender email missing.`);
         continue;
       }
 
-      const hasAttachments = this.gmailMessageParser.hasAttachments(msg.data.payload?.parts ?? []);
-      if (!hasAttachments) {
-        this.logger.debug(`Message ${id} has no attachments; skipping contract review enqueue.`);
+      if (!this.isSameMailbox(senderEmail, authContext.userEmail)) {
+        this.logger.debug(
+          `Skipping auto actions for message ${id}; sender ${senderEmail} differs from mailbox ${authContext.userEmail}.`,
+        );
+        continue;
+      }
+
+      const allowedDocxMimes = new Set([
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+      ]);
+
+      const attachmentParts = (messageData.payload?.parts ?? []).filter((part) => {
+        const mime = part.mimeType?.toLowerCase();
+        return mime ? allowedDocxMimes.has(mime) : false;
+      });
+
+      if (!attachmentParts.length) {
+        this.logger.debug(`Message ${id} lacks DOCX attachments; skipping contract review enqueue.`);
         continue;
       }
 
       await this.jobQueueService
         .enqueueContractReview({
-          messageId: msg.data.id!,
+          messageId: messageData.id ?? id,
           userEmail: authContext.userEmail,
           senderEmail,
           subject,
-          threadId: msg.data.threadId,
+          threadId: messageData.threadId,
         })
         .catch((error) =>
           this.logger.error(
@@ -285,6 +306,7 @@ export class EmailAssistantService {
     return matches ? matches[1] : null;
   }
 
+  // TODO: remove this method after testing
   private async enqueueManualContractReviewTest() {
     try {
       await this.jobQueueService

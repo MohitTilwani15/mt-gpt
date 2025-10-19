@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ProcessErrorArgs, ServiceBusClient, ServiceBusReceiver, ServiceBusReceivedMessage } from '@azure/service-bus';
+import { z } from 'zod';
 
 import { EmailReplyJobPayload } from 'src/queue/jobs';
 import {
@@ -16,6 +17,23 @@ export class EmailReplyProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EmailReplyProcessor.name);
   private receiver: ServiceBusReceiver | null = null;
   private subscription: { close: () => Promise<void> } | null = null;
+  private readonly payloadSchema = z.object({
+    userEmail: z.string().min(1, 'userEmail is required'),
+    messageId: z.string().min(1, 'messageId is required'),
+    threadId: z.string().optional().nullable(),
+    toEmail: z.string().min(1, 'toEmail is required'),
+    subject: z.string().min(1, 'subject is required'),
+    body: z.string().min(1, 'body is required'),
+    attachments: z
+      .array(
+        z.object({
+          filename: z.string().min(1, 'attachment filename is required'),
+          mimeType: z.string().min(1, 'attachment mimeType is required'),
+          data: z.string().min(1, 'attachment data is required'),
+        }),
+      )
+      .optional(),
+  });
 
   constructor(
     @Inject(SERVICE_BUS_CLIENT) private readonly serviceBusClient: ServiceBusClient,
@@ -51,7 +69,7 @@ export class EmailReplyProcessor implements OnModuleInit, OnModuleDestroy {
   private async handleMessage(message: ServiceBusReceivedMessage) {
     const messageId = message.messageId ?? '(no id)';
     const jobName = (message.applicationProperties?.jobName ?? message.subject) as string | undefined;
-    const payload = message.body as EmailReplyJobPayload | undefined;
+    const payload = this.safeParsePayload(message.body);
 
     if (jobName && jobName !== SEND_EMAIL_REPLY_JOB) {
       this.logger.warn(`Received unknown job ${jobName} on email reply queue (message ${messageId}).`);
@@ -104,5 +122,37 @@ export class EmailReplyProcessor implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.warn(`Failed to abandon email reply message ${message.messageId ?? '(no id)'}: ${error}`);
     }
+  }
+
+  private safeParsePayload(body: unknown): EmailReplyJobPayload | null {
+    let candidate: unknown = body;
+
+    if (typeof body === 'string') {
+      try {
+        candidate = JSON.parse(body);
+      } catch (error) {
+        this.logger.warn(`Failed to parse email reply payload string: ${(error as Error)?.message ?? error}`);
+        return null;
+      }
+    } else if (body instanceof Uint8Array || Buffer.isBuffer(body)) {
+      try {
+        candidate = JSON.parse(Buffer.from(body).toString('utf8'));
+      } catch (error) {
+        this.logger.warn(`Failed to parse email reply payload buffer: ${(error as Error)?.message ?? error}`);
+        return null;
+      }
+    }
+
+    const parsed = this.payloadSchema.safeParse(candidate);
+    if (!parsed.success) {
+      this.logger.warn(
+        `Email reply payload validation failed: ${parsed.error.issues
+          .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+          .join('; ')}`,
+      );
+      return null;
+    }
+
+    return parsed.data;
   }
 }

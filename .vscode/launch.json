@@ -66,6 +66,7 @@
       "name": "Debug Web (Simple)",
       "type": "node",
       "request": "launch",
+      "program": "${workspaceFolder}/apps/web/debug.js",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "${workspaceFolder}/apps/web",
@@ -80,6 +81,18 @@
         "<node_internals>/**",
         "**/node_modules/**"
       ]
+    },
+    {
+      "name": "Debug Document Redlining",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/DocumentRedlining/bin/Debug/net9.0/DocumentRedlining.dll",
+      "cwd": "${workspaceFolder}/apps/DocumentRedlining",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      },
+      "justMyCode": true,
+      "console": "integratedTerminal"
     }
   ],
   "compounds": [

@@ -10,15 +10,11 @@ import { EmailAssistantQueryService } from 'src/database/queries/email-assistant
 import { ContractReviewJobPayload } from 'src/queue/jobs';
 import { ChatModel } from 'src/chat/dto/chat.dto';
 import { LlmContractReviewService } from './llm-contract-review.service';
-import { DocxRedlineService } from './docx-redline.service';
+import { JobQueueService } from 'src/queue/job-queue.service';
+import { ContractRedlineJobPayload } from 'src/queue/jobs';
 
 interface ContractReviewResult {
   summary: string[];
-  attachment?: {
-    filename: string;
-    mimeType: string;
-    data: string; // base64
-  };
 }
 
 @Injectable()
@@ -29,7 +25,7 @@ export class ContractReviewService {
     private readonly emailAssistantQuery: EmailAssistantQueryService,
     private readonly configService: ConfigService,
     private readonly llmContractReviewService: LlmContractReviewService,
-    private readonly docxRedlineService: DocxRedlineService,
+    private readonly jobQueueService: JobQueueService,
   ) {}
 
   async reviewContract(payload: ContractReviewJobPayload): Promise<ContractReviewResult | null> {
@@ -41,6 +37,11 @@ export class ContractReviewService {
     }
 
     const primaryAttachment = attachments[0];
+    if (!primaryAttachment?.data) {
+      this.logger.warn(`Primary attachment for message ${payload.messageId} missing data; skipping contract review.`);
+      return null;
+    }
+
     const buffer = Buffer.from(primaryAttachment.data, 'base64');
     const extractedText = await this.extractTextFromAttachment(buffer, primaryAttachment.mimeType ?? '');
 
@@ -52,18 +53,38 @@ export class ContractReviewService {
     });
 
     if (llmReview) {
-      // const attachment = await this.docxRedlineService.buildAttachment({
-      //   review: llmReview,
-      //   metadata: {
-      //     contractType: classifiedType,
-      //     messageId: payload.messageId,
-      //     subject: payload.subject,
-      //   },
-      // });
-
+      if (llmReview.redlines.length) {
+        await this.enqueueRedliningJob({
+          messageId: payload.messageId,
+          contractType: classifiedType,
+          operations: llmReview.redlines,
+          summary: llmReview.summary,
+          metadata: {
+            subject: payload.subject,
+            threadId: payload.threadId,
+          },
+          attachments: attachments.map((attachment) => ({
+            id: String(attachment.id),
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+          })),
+          sourceDocument: {
+            filename: primaryAttachment.filename,
+            mimeType: primaryAttachment.mimeType,
+            data: primaryAttachment.data,
+          },
+          email: {
+            userEmail: payload.userEmail,
+            toEmail: payload.senderEmail,
+            subject: payload.subject ?? 'Contract review feedback',
+            threadId: payload.threadId,
+          },
+        });
+      } else {
+        this.logger.debug(`No redline operations generated for message ${payload.messageId}.`);
+      }
       return {
         summary: llmReview.summary,
-        // attachment,
       };
     }
 
@@ -132,5 +153,18 @@ ${trimmed}`,
     }
 
     return fallback;
+  }
+
+  private async enqueueRedliningJob(payload: ContractRedlineJobPayload) {
+    try {
+      await this.jobQueueService.enqueueContractRedlining(payload);
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue contract redlining job for message ${payload.messageId}: ${
+          (error as Error)?.message ?? error
+        }`,
+        error as Error,
+      );
+    }
   }
 }

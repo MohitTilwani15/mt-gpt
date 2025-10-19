@@ -10,7 +10,6 @@ import {
 } from 'src/queue/queue.constants';
 import { REVIEW_CONTRACT_JOB } from 'src/queue/job.constants';
 import { ContractReviewService } from '../services/contract-review.service';
-import { JobQueueService } from 'src/queue/job-queue.service';
 
 @Injectable()
 export class ContractReviewProcessor implements OnModuleInit, OnModuleDestroy {
@@ -22,7 +21,6 @@ export class ContractReviewProcessor implements OnModuleInit, OnModuleDestroy {
     @Inject(SERVICE_BUS_CLIENT) private readonly serviceBusClient: ServiceBusClient,
     @Inject(SERVICE_BUS_QUEUE_NAMES) private readonly queueNames: ServiceBusQueueNames,
     private readonly contractReviewService: ContractReviewService,
-    private readonly jobQueueService: JobQueueService,
   ) {}
 
   async onModuleInit() {
@@ -75,19 +73,11 @@ export class ContractReviewProcessor implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      const summaryBody = result.summary.length
-        ? result.summary.map((line) => `• ${line}`).join('\n')
-        : 'No summary available for this review.';
-
-      await this.jobQueueService.enqueueEmailReply({
-        userEmail: 'mohit@alphalink.xyz', // TODO: replace with actual user email
-        messageId: payload.messageId,
-        threadId: payload.threadId,
-        toEmail: 'mohit@alphalink.xyz', // TODO: replace with actual recipient email
-        subject: `Review feedback: ${payload.subject}`, // TODO: improve subject
-        body: summaryBody,
-        attachments: result.attachment ? [result.attachment] : undefined,
-      });
+      if (result.summary.length) {
+        this.logger.verbose(
+          `Contract review generated ${result.summary.length} summary items for message ${payload.messageId}.`,
+        );
+      }
 
       this.logger.verbose(`Contract review message ${messageId} completed for message ${payload.messageId}.`);
       await this.complete(message);

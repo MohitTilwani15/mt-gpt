@@ -2,16 +2,27 @@ import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ServiceBusClient, ServiceBusSender } from '@azure/service-bus';
 import { randomUUID } from 'crypto';
 
-import { FileProcessingJobPayload, EmailReplyJobPayload, ContractReviewJobPayload } from './jobs';
+import {
+  FileProcessingJobPayload,
+  EmailReplyJobPayload,
+  ContractReviewJobPayload,
+  ContractRedlineJobPayload,
+} from './jobs';
 import {
   CONTRACT_REVIEW_QUEUE,
+  CONTRACT_REDLINING_QUEUE,
   DOCUMENT_PROCESSING_QUEUE,
   EMAIL_REPLY_QUEUE,
   SERVICE_BUS_CLIENT,
   SERVICE_BUS_QUEUE_NAMES,
   ServiceBusQueueNames,
 } from './queue.constants';
-import { PROCESS_DOCUMENT_JOB, REVIEW_CONTRACT_JOB, SEND_EMAIL_REPLY_JOB } from './job.constants';
+import {
+  GENERATE_CONTRACT_REDLINES_JOB,
+  PROCESS_DOCUMENT_JOB,
+  REVIEW_CONTRACT_JOB,
+  SEND_EMAIL_REPLY_JOB,
+} from './job.constants';
 
 @Injectable()
 export class JobQueueService implements OnModuleDestroy {
@@ -59,6 +70,17 @@ export class JobQueueService implements OnModuleDestroy {
       payload,
     });
     this.logger.debug(`Queued contract review message ${messageId} for message ${payload.messageId}.`);
+    return messageId;
+  }
+
+  async enqueueContractRedlining(payload: ContractRedlineJobPayload) {
+    const messageId = await this.sendMessage(CONTRACT_REDLINING_QUEUE, this.queueNames.contractRedlining, {
+      jobName: GENERATE_CONTRACT_REDLINES_JOB,
+      payload,
+    });
+    this.logger.debug(
+      `Queued contract redlining message ${messageId} for message ${payload.messageId} with ${payload.operations.length} operations.`,
+    );
     return messageId;
   }
 
