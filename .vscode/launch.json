@@ -98,7 +98,7 @@
   "compounds": [
     {
       "name": "Debug All",
-      "configurations": ["Debug API", "Debug Web (Simple)"],
+      "configurations": ["Debug API", "Debug Web (Simple)", "Debug Document Redlining"],
       "stopAll": true
     }
   ]
