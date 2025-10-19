@@ -1,6 +1,5 @@
 using DocumentRedlining.Options;
 using DocumentRedlining.Services;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 

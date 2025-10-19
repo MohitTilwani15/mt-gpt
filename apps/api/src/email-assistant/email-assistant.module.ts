@@ -23,7 +23,6 @@ import { LlmContractReviewService } from './services/llm-contract-review.service
 import { ContractTemplateService } from './services/contract-template.service';
 import { ContractPlaybookService } from './services/contract-playbook.service';
 import { CloudflareR2Service } from 'src/services/cloudflare-r2.service';
-import { DocxRedlineService } from './services/docx-redline.service';
 
 @Module({
   imports: [DatabaseModule, ConfigModule, QueueModule],
@@ -47,7 +46,6 @@ import { DocxRedlineService } from './services/docx-redline.service';
     ContractTemplateService,
     ContractPlaybookService,
     CloudflareR2Service,
-    DocxRedlineService,
   ],
   exports: [EmailSenderService, ContractPlaybookService],
 })

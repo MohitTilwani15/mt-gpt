@@ -1,6 +1,4 @@
-using System.Linq;
 using DocumentRedlining.Models;
-using Microsoft.Extensions.Logging;
 
 namespace DocumentRedlining.Services;
 

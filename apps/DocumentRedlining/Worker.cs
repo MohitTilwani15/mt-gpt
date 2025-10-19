@@ -226,6 +226,9 @@ public class Worker : BackgroundService
             return "No summary available for this review.";
         }
 
-        return string.Join("\n", summary.Select(line => $"• {line}"));
+        var indexed = summary
+            .Select((line, idx) => $"{idx + 1}. {line}");
+
+        return string.Join("\n", indexed);
     }
 }
