@@ -18,11 +18,13 @@ export class ChatQueryService {
   async createChat({
     id,
     userId,
+    tenantId,
     title,
     assistantId,
   }: {
     id: string;
     userId: string;
+    tenantId: string;
     title?: string;
     assistantId?: string | null;
   }) {
@@ -32,6 +34,7 @@ export class ChatQueryService {
         .values({
           id,
           userId,
+          tenantId,
           title,
           createdAt: new Date(),
           assistantId: assistantId ?? null,
@@ -52,13 +55,15 @@ export class ChatQueryService {
     }
   }
 
-  async getChatsByUserId({
-    id,
+  async getChatsForTenant({
+    userId,
+    tenantId,
     limit,
     startingAfter,
     endingBefore,
   }: {
-    id: string;
+    userId: string;
+    tenantId: string;
     limit: number;
     startingAfter: string | null;
     endingBefore: string | null;
@@ -66,15 +71,17 @@ export class ChatQueryService {
     try {
       const extendedLimit = limit + 1;
 
+      const baseWhere = and(
+        eq(chat.userId, userId),
+        eq(chat.tenantId, tenantId),
+        eq(chat.isArchived, false),
+      );
+
       const query = (whereCondition?: SQL<any>) =>
         this.db
           .select()
           .from(chat)
-          .where(
-            whereCondition
-              ? and(eq(chat.userId, id), eq(chat.isArchived, false), whereCondition)
-              : and(eq(chat.userId, id), eq(chat.isArchived, false)),
-          )
+          .where(whereCondition ? and(baseWhere, whereCondition) : baseWhere)
           .orderBy(desc(chat.createdAt))
           .limit(extendedLimit);
 
@@ -84,7 +91,7 @@ export class ChatQueryService {
         const [selectedChat] = await this.db
           .select()
           .from(chat)
-          .where(eq(chat.id, startingAfter))
+          .where(and(eq(chat.id, startingAfter), eq(chat.tenantId, tenantId)))
           .limit(1);
 
         if (!selectedChat) {
@@ -99,7 +106,7 @@ export class ChatQueryService {
         const [selectedChat] = await this.db
           .select()
           .from(chat)
-          .where(eq(chat.id, endingBefore))
+          .where(and(eq(chat.id, endingBefore), eq(chat.tenantId, tenantId)))
           .limit(1);
 
         if (!selectedChat) {
@@ -128,9 +135,12 @@ export class ChatQueryService {
     }
   }
 
-  async getChatById({ id }: { id: string }) {
+  async getChatById({ id, tenantId }: { id: string; tenantId?: string }) {
     try {
-      const [selectedChat] = await this.db.select().from(chat).where(eq(chat.id, id));
+      const whereClause = tenantId
+        ? and(eq(chat.id, id), eq(chat.tenantId, tenantId))
+        : eq(chat.id, id);
+      const [selectedChat] = await this.db.select().from(chat).where(whereClause);
       return selectedChat;
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to get chat by id');
@@ -139,64 +149,66 @@ export class ChatQueryService {
 
   async updateChatLastContextById({
     chatId,
+    tenantId,
     context,
   }: {
     chatId: string;
+    tenantId: string;
     context: LanguageModelV2Usage;
   }) {
     try {
       return await this.db
         .update(chat)
         .set({ lastContext: context })
-        .where(eq(chat.id, chatId));
+        .where(and(eq(chat.id, chatId), eq(chat.tenantId, tenantId)));
     } catch (error) {
       console.warn('Failed to update lastContext for chat', chatId, error);
       return;
     }
   }
 
-  async deleteChatById(id: string) {
+  async deleteChatById(id: string, tenantId: string) {
     try {
-      await this.db.delete(chat).where(eq(chat.id, id));
+      await this.db.delete(chat).where(and(eq(chat.id, id), eq(chat.tenantId, tenantId)));
       return { id };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to delete chat');
     }
   }
 
-  async updateChatVisibilityById({ id, isPublic }: { id: string; isPublic: boolean }) {
+  async updateChatVisibilityById({ id, tenantId, isPublic }: { id: string; tenantId: string; isPublic: boolean }) {
     try {
-      await this.db.update(chat).set({ isPublic }).where(eq(chat.id, id));
+      await this.db.update(chat).set({ isPublic }).where(and(eq(chat.id, id), eq(chat.tenantId, tenantId)));
       return { id, isPublic };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to update chat visibility');
     }
   }
 
-  async updateChatArchiveStateById({ id, isArchived }: { id: string; isArchived: boolean }) {
+  async updateChatArchiveStateById({ id, tenantId, isArchived }: { id: string; tenantId: string; isArchived: boolean }) {
     try {
-      await this.db.update(chat).set({ isArchived }).where(eq(chat.id, id));
+      await this.db.update(chat).set({ isArchived }).where(and(eq(chat.id, id), eq(chat.tenantId, tenantId)));
       return { id, isArchived };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to update chat archive state');
     }
   }
 
-  async updateChatTitleById({ id, title }: { id: string; title: string }) {
+  async updateChatTitleById({ id, tenantId, title }: { id: string; tenantId: string; title: string }) {
     try {
-      await this.db.update(chat).set({ title }).where(eq(chat.id, id));
+      await this.db.update(chat).set({ title }).where(and(eq(chat.id, id), eq(chat.tenantId, tenantId)));
       return { id, title };
     } catch (error) {
       throw new ChatSDKError('bad_request:database', 'Failed to update chat title');
     }
   }
 
-  async assignAssistantToChat({ chatId, assistantId }: { chatId: string; assistantId: string }) {
+  async assignAssistantToChat({ chatId, tenantId, assistantId }: { chatId: string; tenantId: string; assistantId: string }) {
     try {
       const [updated] = await this.db
         .update(chat)
         .set({ assistantId })
-        .where(eq(chat.id, chatId))
+        .where(and(eq(chat.id, chatId), eq(chat.tenantId, tenantId)))
         .returning();
 
       return updated;
@@ -207,10 +219,12 @@ export class ChatQueryService {
 
   async searchChatsByTitle({
     userId,
+    tenantId,
     term,
     limit = 10,
   }: {
     userId: string;
+    tenantId: string;
     term: string;
     limit?: number;
   }) {
@@ -226,6 +240,7 @@ export class ChatQueryService {
       .where(
         and(
           eq(chat.userId, userId),
+          eq(chat.tenantId, tenantId),
           eq(chat.isArchived, false),
           sql`LOWER(${chat.title}) LIKE ${likeValue}`,
         ),

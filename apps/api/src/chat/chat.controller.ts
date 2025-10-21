@@ -30,11 +30,15 @@ import {
   ForkChatRequestDto,
 } from './dto/chat.dto';
 import { ChatSDKError } from 'src/lib/errors';
+import { TenantService } from 'src/tenant/tenant.service';
 
 @Controller('chat')
 @UseGuards(AuthGuard)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly tenantService: TenantService,
+  ) {}
 
   @Post()
   async createChat(
@@ -44,6 +48,8 @@ export class ChatController {
     @Req() req: Request,
   ) {
     try {
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+
       const ac = new AbortController();
       const abort = () => { if (!ac.signal.aborted) ac.abort(); };
       req.on('aborted', abort);
@@ -57,7 +63,7 @@ export class ChatController {
         res.flushHeaders();
       }
 
-      const result = await this.chatService.createChat(body, session, ac.signal);
+      const result = await this.chatService.createChat(body, session, tenant, ac.signal);
       const webSseStream = result.pipeThrough(new JsonToSseTransformStream());
       const nodeReadable = Readable.fromWeb(webSseStream);
 
@@ -98,8 +104,11 @@ export class ChatController {
     @Query() query: GetChatsQueryDto,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+
       const limit = Number.parseInt(query.limit || '10');
       const startingAfter = query.startingAfter;
       const endingBefore = query.endingBefore;
@@ -111,7 +120,7 @@ export class ChatController {
         );
       }
 
-      const chats = await this.chatService.getChats(session.user.id, {
+      const chats = await this.chatService.getChats(session.user.id, tenant, {
         limit,
         startingAfter,
         endingBefore,
@@ -159,9 +168,11 @@ export class ChatController {
     @Query() query: GetVotesQueryDto,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
-      const votes = await this.chatService.getVotes(query.chatId, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const votes = await this.chatService.getVotes(query.chatId, session, tenant);
       return res.json(votes);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -184,6 +195,7 @@ export class ChatController {
     @Query('limit') limitStr: string,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
       const term = (q || '').trim();
@@ -191,8 +203,10 @@ export class ChatController {
         return res.json({ results: [] });
       }
       const limit = Number.parseInt(limitStr || '10');
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
       const results = await this.chatService.searchChatsByMessageTerm({
         userId: session.user.id,
+        tenantId: tenant.tenantId,
         term,
         limit,
       });
@@ -216,9 +230,11 @@ export class ChatController {
     @Param('id') id: string,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
-      const result = await this.chatService.getChatById(id, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const result = await this.chatService.getChatById(id, session, tenant);
       return res.json(result);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -240,9 +256,11 @@ export class ChatController {
     @Param('id') id: string,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
-      const result = await this.chatService.deleteChatById(id, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const result = await this.chatService.deleteChatById(id, session, tenant);
       return res.json(result);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -260,9 +278,11 @@ export class ChatController {
     @Body() body: { id: string; assistantId?: string },
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
-      const chat = await this.chatService.createNewChat(body.id, session, body.assistantId);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const chat = await this.chatService.createNewChat(body.id, session, tenant, body.assistantId);
       return res.json(chat);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -285,12 +305,15 @@ export class ChatController {
     @Query() query: GetMessagesQueryDto,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
       const messages = await this.chatService.getMessagesByChatId(
         chatId,
         query,
         session,
+        tenant,
       );
       return res.json(messages);
     } catch (error) {
@@ -313,9 +336,11 @@ export class ChatController {
     @Body() body: VoteMessageDto,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
-      const result = await this.chatService.updateVote(body, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const result = await this.chatService.updateVote(body, session, tenant);
       return res.json(result);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -338,12 +363,14 @@ export class ChatController {
     @Body() body: { isPublic: boolean },
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
       if (typeof body?.isPublic !== 'boolean') {
         return res.status(HttpStatus.BAD_REQUEST).json({ error: 'bad_request:api', message: 'isPublic must be boolean' });
       }
-      const result = await this.chatService.updateChatVisibilityById(id, body.isPublic, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const result = await this.chatService.updateChatVisibilityById(id, body.isPublic, session, tenant);
       return res.json(result);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -359,12 +386,14 @@ export class ChatController {
     @Body() body: { isArchived: boolean },
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
       if (typeof body?.isArchived !== 'boolean') {
         return res.status(HttpStatus.BAD_REQUEST).json({ error: 'bad_request:api', message: 'isArchived must be boolean' });
       }
-      const result = await this.chatService.updateChatArchiveStateById(id, body.isArchived, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const result = await this.chatService.updateChatArchiveStateById(id, body.isArchived, session, tenant);
       return res.json(result);
     } catch (error) {
       if (error instanceof ChatSDKError) {
@@ -380,13 +409,15 @@ export class ChatController {
     @Body() body: ForkChatRequestDto,
     @Session() session: UserSession,
     @Res() res: Response,
+    @Req() req: Request,
   ) {
     try {
       if (!body?.messageId) {
         return res.status(HttpStatus.BAD_REQUEST).json({ error: 'bad_request:api', message: 'messageId is required' });
       }
 
-      const result = await this.chatService.forkChat(id, body.messageId, session);
+      const tenant = await this.tenantService.resolveTenantContext(session, req);
+      const result = await this.chatService.forkChat(id, body.messageId, session, tenant);
       return res.json(result);
     } catch (error) {
       if (error instanceof ChatSDKError) {

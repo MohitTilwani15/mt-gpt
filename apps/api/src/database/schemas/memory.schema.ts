@@ -3,12 +3,16 @@ import { InferSelectModel, relations } from 'drizzle-orm';
 
 import { user } from './auth.schema';
 import { chat, message } from './conversation.schema';
+import { tenant } from './tenant.schema';
 
 export const memory = pgTable(
   'Memory',
   {
     id: uuid('id').primaryKey().notNull().defaultRandom(),
     userId: varchar('userId').notNull().references(() => user.id),
+    tenantId: uuid('tenantId')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
     chatId: uuid('chatId').references(() => chat.id, { onDelete: 'cascade' }),
     messageId: uuid('messageId').references(() => message.id, { onDelete: 'set null' }),
     text: pgText('text').notNull(),
@@ -29,6 +33,10 @@ export const memoryRelations = relations(memory, ({ one }) => ({
   user: one(user, {
     fields: [memory.userId],
     references: [user.id],
+  }),
+  tenant: one(tenant, {
+    fields: [memory.tenantId],
+    references: [tenant.id],
   }),
   chat: one(chat, {
     fields: [memory.chatId],

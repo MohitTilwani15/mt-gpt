@@ -9,6 +9,7 @@ export interface Mem0CreateMemoryParams {
   messageId?: string;
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   metadata?: Record<string, any>;
+  tenantId?: string;
 }
 
 export interface Mem0SearchMemoryParams {
@@ -36,13 +37,14 @@ export class Mem0MemoryService {
   }
 
   async addMemory(params: Mem0CreateMemoryParams): Promise<Memory[]> {
-    const { userId, chatId, messageId, messages, metadata = {} } = params;
+    const { userId, chatId, messageId, tenantId, messages, metadata = {} } = params;
 
     const enhancedMetadata = {
       ...metadata,
       chatId,
       messageId,
       userId,
+      tenantId,
     };
 
     try {

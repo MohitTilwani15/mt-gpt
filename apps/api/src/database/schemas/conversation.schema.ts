@@ -8,11 +8,15 @@ import type { LanguageModelV2Usage } from "@ai-sdk/provider";
 import { user } from "./auth.schema";
 import { assistant } from './assistant.schema';
 import { MyProviderMetadata } from '../../lib/message-type'
+import { tenant } from './tenant.schema';
 
 export const chat = pgTable('Chat', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   title: text('title'),
+  tenantId: uuid('tenantId')
+    .notNull()
+    .references(() => tenant.id, { onDelete: 'restrict' }),
   userId: text('userId')
     .notNull()
     .references(() => user.id),
@@ -126,6 +130,9 @@ export const document = pgTable('Document', {
   chatId: uuid('chatId')
     .notNull()
     .references(() => chat.id, { onDelete: "cascade" }),
+  tenantId: uuid('tenantId')
+    .notNull()
+    .references(() => tenant.id, { onDelete: 'restrict' }),
   messageId: uuid('messageId')
     .references(() => message.id, { onDelete: "cascade" }),
   fileName: varchar('fileName', { length: 255 }).notNull(),
@@ -142,6 +149,10 @@ export type Document = InferSelectModel<typeof document>;
 export const chatRelations = relations(chat, ({ many, one }) => ({
   messages: many(message),
   documents: many(document),
+  tenant: one(tenant, {
+    fields: [chat.tenantId],
+    references: [tenant.id],
+  }),
   assistant: one(assistant, {
     fields: [chat.assistantId],
     references: [assistant.id],
@@ -168,6 +179,10 @@ export const documentRelations = relations(document, ({ one }) => ({
   chat: one(chat, {
     fields: [document.chatId],
     references: [chat.id],
+  }),
+  tenant: one(tenant, {
+    fields: [document.tenantId],
+    references: [tenant.id],
   }),
   message: one(message, {
     fields: [document.messageId],

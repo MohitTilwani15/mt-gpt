@@ -73,7 +73,7 @@ export class DocumentProcessingProcessor implements OnModuleInit, OnModuleDestro
     }
 
     try {
-      await this.documentProcessingService.processDocument(payload.documentId);
+      await this.documentProcessingService.processDocument(payload.documentId, payload.tenantId);
       this.logger.verbose(`Document ${payload.documentId} processed successfully (message ${messageId}).`);
       await this.complete(message);
     } catch (error) {

@@ -10,6 +10,7 @@ import { databaseSchema } from '../../database/schemas';
 
 export interface CreateMemoryParams {
   userId: string;
+  tenantId: string;
   chatId?: string | null;
   messageId?: string | null;
   text: string;
@@ -18,6 +19,7 @@ export interface CreateMemoryParams {
 
 export interface SearchMemoryParams {
   userId: string;
+  tenantId: string;
   chatId?: string | null;
   query: string;
   limit?: number;
@@ -32,7 +34,7 @@ export class MemoryService {
   ) {}
 
   async createMemory(params: CreateMemoryParams) {
-    const { userId, chatId = null, messageId = null, text, expiresAt = null } = params;
+    const { userId, tenantId, chatId = null, messageId = null, text, expiresAt = null } = params;
 
     let embedding = null as any;
     if (text && text.trim()) {
@@ -46,6 +48,7 @@ export class MemoryService {
     const [row] = await this.db
       .insert(databaseSchema.memory)
       .values({
+        tenantId,
         userId,
         chatId: chatId || null,
         messageId: messageId || null,
@@ -62,6 +65,7 @@ export class MemoryService {
   async searchMemories(params: SearchMemoryParams) {
     const {
       userId,
+      tenantId,
       chatId = null,
       query,
       limit = 5,
@@ -75,6 +79,7 @@ export class MemoryService {
 
     const where = and(
       eq(databaseSchema.memory.userId, userId),
+      eq(databaseSchema.memory.tenantId, tenantId),
       chatId ? eq(databaseSchema.memory.chatId, chatId as any) : sql`1=1`,
       orNullNotExpired(databaseSchema.memory.expiresAt),
       isNotNull(databaseSchema.memory.embedding),

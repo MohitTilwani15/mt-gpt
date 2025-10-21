@@ -2,6 +2,7 @@ import { jsonb, pgTable, primaryKey, text, timestamp, uuid, varchar, boolean, in
 import { InferSelectModel, relations, sql } from 'drizzle-orm';
 
 import { user } from './auth.schema';
+import { tenant } from './tenant.schema';
 
 export interface AssistantCapabilities {
   webSearch?: boolean;
@@ -19,6 +20,9 @@ export const assistant = pgTable('Assistant', {
   ownerId: text('ownerId')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
+  tenantId: uuid('tenantId')
+    .notNull()
+    .references(() => tenant.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 120 }).notNull(),
   description: text('description'),
   instructions: text('instructions'),
@@ -37,6 +41,9 @@ export const assistantShare = pgTable(
     assistantId: uuid('assistantId')
       .notNull()
       .references(() => assistant.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenantId')
+      .notNull()
+      .references(() => tenant.id, { onDelete: 'cascade' }),
     userId: text('userId')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
@@ -55,6 +62,9 @@ export const assistantKnowledge = pgTable('AssistantKnowledge', {
   assistantId: uuid('assistantId')
     .notNull()
     .references(() => assistant.id, { onDelete: 'cascade' }),
+  tenantId: uuid('tenantId')
+    .notNull()
+    .references(() => tenant.id, { onDelete: 'cascade' }),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   fileName: varchar('fileName', { length: 255 }).notNull(),
   fileKey: varchar('fileKey', { length: 500 }).notNull(),
@@ -68,15 +78,23 @@ export const assistantKnowledge = pgTable('AssistantKnowledge', {
 
 export type AssistantKnowledge = InferSelectModel<typeof assistantKnowledge>;
 
-export const assistantRelations = relations(assistant, ({ many }) => ({
+export const assistantRelations = relations(assistant, ({ many, one }) => ({
   shares: many(assistantShare),
   knowledge: many(assistantKnowledge),
+  tenant: one(tenant, {
+    fields: [assistant.tenantId],
+    references: [tenant.id],
+  }),
 }));
 
 export const assistantShareRelations = relations(assistantShare, ({ one }) => ({
   assistant: one(assistant, {
     fields: [assistantShare.assistantId],
     references: [assistant.id],
+  }),
+  tenant: one(tenant, {
+    fields: [assistantShare.tenantId],
+    references: [tenant.id],
   }),
   user: one(user, {
     fields: [assistantShare.userId],
@@ -88,6 +106,10 @@ export const assistantKnowledgeRelations = relations(assistantKnowledge, ({ one 
   assistant: one(assistant, {
     fields: [assistantKnowledge.assistantId],
     references: [assistant.id],
+  }),
+  tenant: one(tenant, {
+    fields: [assistantKnowledge.tenantId],
+    references: [tenant.id],
   }),
   uploader: one(user, {
     fields: [assistantKnowledge.uploadedBy],

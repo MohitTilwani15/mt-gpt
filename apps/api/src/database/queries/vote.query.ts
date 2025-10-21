@@ -15,11 +15,11 @@ export class VoteQueryService {
     private readonly db: NodePgDatabase<typeof databaseSchema>,
   ) {}
 
-  async updateVote(request: VoteMessageDto, userId: string) {
+  async updateVote(request: VoteMessageDto, userId: string, tenantId: string) {
     const chatRecord = await this.db
       .select()
       .from(chat)
-      .where(and(eq(chat.id, request.chatId), eq(chat.userId, userId)))
+      .where(and(eq(chat.id, request.chatId), eq(chat.userId, userId), eq(chat.tenantId, tenantId)))
       .limit(1);
 
     if (chatRecord.length === 0) {
@@ -54,11 +54,11 @@ export class VoteQueryService {
     return result;
   }
 
-  async getVotes(chatId: string, userId: string) {
+  async getVotes(chatId: string, userId: string, tenantId: string) {
     const chatRecord = await this.db
       .select()
       .from(chat)
-      .where(and(eq(chat.id, chatId), eq(chat.userId, userId)))
+      .where(and(eq(chat.id, chatId), eq(chat.userId, userId), eq(chat.tenantId, tenantId)))
       .limit(1);
 
     if (chatRecord.length === 0) {
@@ -74,11 +74,11 @@ export class VoteQueryService {
     return votes;
   }
 
-  async getVoteForMessage(chatId: string, messageId: string, userId: string) {
+  async getVoteForMessage(chatId: string, messageId: string, userId: string, tenantId: string) {
     const chatRecord = await this.db
       .select()
       .from(chat)
-      .where(and(eq(chat.id, chatId), eq(chat.userId, userId)))
+      .where(and(eq(chat.id, chatId), eq(chat.userId, userId), eq(chat.tenantId, tenantId)))
       .limit(1);
 
     if (chatRecord.length === 0) {

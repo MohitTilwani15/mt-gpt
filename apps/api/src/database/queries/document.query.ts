@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, desc, cosineDistance } from 'drizzle-orm';
+import { and, eq, desc, cosineDistance } from 'drizzle-orm';
 import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 
@@ -10,6 +10,7 @@ import { databaseSchema } from '../../database/schemas';
 
 export interface CreateDocumentParams {
   chatId: string;
+  tenantId: string;
   text: string;
   fileName?: string;
   fileKey?: string;
@@ -19,6 +20,7 @@ export interface CreateDocumentParams {
 
 export interface SearchDocumentsParams {
   chatId: string;
+  tenantId: string;
   query: string;
   limit?: number;
 }
@@ -31,7 +33,7 @@ export class DocumentQueryService {
   ) {}
 
   async createDocument(params: CreateDocumentParams) {
-    const { chatId, text, fileName, fileKey, fileSize, mimeType } = params;
+    const { chatId, tenantId, text, fileName, fileKey, fileSize, mimeType } = params;
     
     let embedding = null;
     if (text && text.trim()) {
@@ -46,6 +48,7 @@ export class DocumentQueryService {
       .insert(databaseSchema.document)
       .values({
         chatId,
+        tenantId,
         text,
         fileName: fileName || 'text-document.txt',
         fileKey: fileKey || `text-${Date.now()}.txt`,
@@ -60,7 +63,7 @@ export class DocumentQueryService {
   }
 
   async searchDocuments(params: SearchDocumentsParams) {
-    const { chatId, query, limit = 5 } = params;
+    const { chatId, tenantId, query, limit = 5 } = params;
     
     // Generate embedding for the search query
     const { embedding: queryEmbedding } = await embed({
@@ -78,7 +81,7 @@ export class DocumentQueryService {
         createdAt: databaseSchema.document.createdAt,
       })
       .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.chatId, chatId))
+      .where(and(eq(databaseSchema.document.chatId, chatId), eq(databaseSchema.document.tenantId, tenantId)))
       .orderBy(cosineDistance(databaseSchema.document.embedding, queryEmbedding))
       .limit(limit);
 
@@ -88,33 +91,33 @@ export class DocumentQueryService {
     }));
   }
 
-  async getDocumentsByChatId(chatId: string) {
+  async getDocumentsByChatId(chatId: string, tenantId: string) {
     return this.db
       .select()
       .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.chatId, chatId))
+      .where(and(eq(databaseSchema.document.chatId, chatId), eq(databaseSchema.document.tenantId, tenantId)))
       .orderBy(desc(databaseSchema.document.createdAt));
   }
 
-  async getDocumentById(documentId: string) {
+  async getDocumentById(documentId: string, tenantId: string) {
     return this.db
       .select()
       .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, documentId))
+      .where(and(eq(databaseSchema.document.id, documentId), eq(databaseSchema.document.tenantId, tenantId)))
   }
 
-  async deleteDocumentById(id: string) {
+  async deleteDocumentById(id: string, tenantId: string) {
     const [deletedDocument] = await this.db
       .delete(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, id))
+      .where(and(eq(databaseSchema.document.id, id), eq(databaseSchema.document.tenantId, tenantId)))
       .returning();
 
     return deletedDocument;
   }
 
-  async deleteDocumentsByChatId(chatId: string) {
+  async deleteDocumentsByChatId(chatId: string, tenantId: string) {
     return this.db
       .delete(databaseSchema.document)
-      .where(eq(databaseSchema.document.chatId, chatId));
+      .where(and(eq(databaseSchema.document.chatId, chatId), eq(databaseSchema.document.tenantId, tenantId)));
   }
 }

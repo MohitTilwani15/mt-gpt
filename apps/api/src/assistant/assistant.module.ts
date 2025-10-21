@@ -10,9 +10,10 @@ import { AssistantQueryService } from 'src/database/queries/assistant.query';
 import { AssistantKnowledgeQueryService } from 'src/database/queries/assistant-knowledge.query';
 import { UserQueryService } from 'src/database/queries/user.query';
 import { CloudflareR2Service } from 'src/services/cloudflare-r2.service';
+import { TenantModule } from 'src/tenant/tenant.module';
 
 @Module({
-  imports: [DatabaseModule, ConfigModule],
+  imports: [DatabaseModule, ConfigModule, TenantModule],
   controllers: [AssistantController, AssistantKnowledgeController],
   providers: [
     AssistantService,

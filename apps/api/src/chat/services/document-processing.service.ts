@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -27,13 +27,15 @@ export class DocumentProcessingService {
     private readonly cloudflareR2Service: CloudflareR2Service,
   ) {}
 
-  async processDocument(documentId: string, options?: { force?: boolean }) {
+  async processDocument(documentId: string, tenantId?: string, options?: { force?: boolean }) {
     let stage: string = 'initial';
 
     const [document] = await this.db
       .select()
       .from(databaseSchema.document)
-      .where(eq(databaseSchema.document.id, documentId))
+      .where(tenantId
+        ? and(eq(databaseSchema.document.id, documentId), eq(databaseSchema.document.tenantId, tenantId))
+        : eq(databaseSchema.document.id, documentId))
       .limit(1);
 
     if (!document) {
@@ -72,7 +74,9 @@ export class DocumentProcessingService {
         await this.db
           .update(databaseSchema.document)
           .set({ text: null, embedding: null })
-          .where(eq(databaseSchema.document.id, documentId));
+          .where(tenantId
+            ? and(eq(databaseSchema.document.id, documentId), eq(databaseSchema.document.tenantId, tenantId))
+            : eq(databaseSchema.document.id, documentId));
         return;
       }
 
@@ -89,7 +93,9 @@ export class DocumentProcessingService {
       await this.db
         .update(databaseSchema.document)
         .set({ text: sanitized, embedding })
-        .where(eq(databaseSchema.document.id, documentId));
+        .where(tenantId
+          ? and(eq(databaseSchema.document.id, documentId), eq(databaseSchema.document.tenantId, tenantId))
+          : eq(databaseSchema.document.id, documentId));
 
       this.logger.log(`Document ${documentId} processed successfully.`);
     } catch (error) {

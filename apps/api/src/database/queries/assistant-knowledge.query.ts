@@ -7,6 +7,7 @@ import { databaseSchema } from '../schemas';
 
 interface CreateAssistantKnowledgeParams {
   assistantId: string;
+  tenantId: string;
   fileName: string;
   fileKey: string;
   fileSize: number;
@@ -23,12 +24,13 @@ export class AssistantKnowledgeQueryService {
   ) {}
 
   async createKnowledgeRecord(params: CreateAssistantKnowledgeParams) {
-    const { assistantId, fileName, fileKey, fileSize, mimeType, text, embedding, uploadedBy } = params;
+    const { assistantId, tenantId, fileName, fileKey, fileSize, mimeType, text, embedding, uploadedBy } = params;
 
     const [record] = await this.db
       .insert(databaseSchema.assistantKnowledge)
       .values({
         assistantId,
+        tenantId,
         fileName,
         fileKey,
         fileSize,
@@ -42,20 +44,24 @@ export class AssistantKnowledgeQueryService {
     return record;
   }
 
-  async listKnowledge(assistantId: string) {
+  async listKnowledge(assistantId: string, tenantId: string) {
     return this.db
       .select()
       .from(databaseSchema.assistantKnowledge)
-      .where(eq(databaseSchema.assistantKnowledge.assistantId, assistantId));
+      .where(and(
+        eq(databaseSchema.assistantKnowledge.assistantId, assistantId),
+        eq(databaseSchema.assistantKnowledge.tenantId, tenantId),
+      ));
   }
 
-  async deleteKnowledgeRecord(assistantId: string, knowledgeId: string) {
+  async deleteKnowledgeRecord(assistantId: string, tenantId: string, knowledgeId: string) {
     const [record] = await this.db
       .delete(databaseSchema.assistantKnowledge)
       .where(
         and(
           eq(databaseSchema.assistantKnowledge.id, knowledgeId),
           eq(databaseSchema.assistantKnowledge.assistantId, assistantId),
+          eq(databaseSchema.assistantKnowledge.tenantId, tenantId),
         ),
       )
       .returning();

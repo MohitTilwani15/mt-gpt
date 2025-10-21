@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { CloudflareR2Service } from '../../services/cloudflare-r2.service'
 import { DATABASE_CONNECTION } from '../../database/database-connection';
@@ -11,6 +11,7 @@ import { FileProcessingJobPayload } from '../../queue/jobs';
 
 export interface CreateFileDocumentParams {
   chatId: string;
+  tenantId: string;
   file: Express.Multer.File;
   extractText?: boolean;
   userId?: string;
@@ -30,7 +31,7 @@ export class FileDocumentService {
   ) {}
 
   async createFileDocument(params: CreateFileDocumentParams) {
-    const { chatId, file, extractText, userId } = params;
+    const { chatId, tenantId, file, extractText, userId } = params;
     const shouldExtractText = this.normalizeBooleanFlag(extractText);
     
     const { key: fileKey, url: downloadUrl } = await this.cloudflareR2Service.uploadFile({
@@ -42,7 +43,7 @@ export class FileDocumentService {
         const existingChat = await tx
           .select()
           .from(databaseSchema.chat)
-          .where(eq(databaseSchema.chat.id, chatId))
+          .where(and(eq(databaseSchema.chat.id, chatId), eq(databaseSchema.chat.tenantId, tenantId)))
           .limit(1);
 
         if (!existingChat.length) {
@@ -53,13 +54,17 @@ export class FileDocumentService {
               createdAt: new Date(),
               title: `Chat with ${file.originalname}`,
               userId,
+              tenantId,
             });
+        } else if (existingChat[0].tenantId !== tenantId) {
+          throw new Error('Unable to attach documents across workspaces');
         }
 
         const [doc] = await tx
           .insert(databaseSchema.document)
           .values({
             chatId,
+            tenantId,
             fileName: file.originalname,
             fileKey,
             fileSize: file.size,
@@ -77,6 +82,7 @@ export class FileDocumentService {
         const jobPayload: FileProcessingJobPayload = {
           documentId: document.id,
           chatId,
+          tenantId,
           fileKey,
           mimeType: file.mimetype,
           fileName: file.originalname,
@@ -103,15 +109,17 @@ export class FileDocumentService {
 
   async createMultipleFileDocuments(params: {
     chatId: string;
+    tenantId: string;
     files: Express.Multer.File[];
     extractText?: boolean;
     userId?: string;
   }) {
-    const { chatId, files, extractText: shouldExtractText = false, userId } = params;
+    const { chatId, tenantId, files, extractText: shouldExtractText = false, userId } = params;
 
     const createPromises = files.map(file =>
       this.createFileDocument({
         chatId,
+        tenantId,
         file,
         extractText: shouldExtractText,
         userId,

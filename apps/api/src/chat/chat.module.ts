@@ -23,9 +23,10 @@ import { AIResponseService } from './services/ai-response.service';
 import { DocumentProcessingService } from './services/document-processing.service';
 import { DocumentProcessingProcessor } from './processors/document-processing.processor';
 import { QueueModule } from 'src/queue/queue.module';
+import { TenantModule } from 'src/tenant/tenant.module';
 
 @Module({
-  imports: [DatabaseModule, ConfigModule, QueueModule],
+  imports: [DatabaseModule, ConfigModule, QueueModule, TenantModule],
   controllers: [ChatController, FileController],
   providers: [
     ChatService,

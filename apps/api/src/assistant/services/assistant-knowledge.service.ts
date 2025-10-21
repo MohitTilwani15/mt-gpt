@@ -11,6 +11,7 @@ import { CloudflareR2Service } from 'src/services/cloudflare-r2.service';
 
 interface UploadKnowledgeParams {
   assistantId: string;
+  tenantId: string;
   files: Express.Multer.File[];
   extractText?: boolean;
   userId: string;
@@ -25,8 +26,8 @@ export class AssistantKnowledgeService {
     private readonly configService: ConfigService,
   ) {}
 
-  private async ensureCanManageKnowledge(assistantId: string, userId: string) {
-    const assistant = await this.assistantQueryService.getAssistantForUser(assistantId, userId);
+  private async ensureCanManageKnowledge(assistantId: string, tenantId: string, userId: string) {
+    const assistant = await this.assistantQueryService.getAssistantForUser(assistantId, userId, tenantId);
 
     if (!assistant) {
       throw new NotFoundException('Assistant not found');
@@ -48,6 +49,7 @@ export class AssistantKnowledgeService {
   async uploadKnowledge(params: UploadKnowledgeParams) {
     const {
       assistantId,
+      tenantId,
       files,
       extractText: shouldExtractTextInput,
       userId,
@@ -58,12 +60,12 @@ export class AssistantKnowledgeService {
       throw new BadRequestException('No files provided');
     }
 
-    await this.ensureCanManageKnowledge(assistantId, userId);
+    await this.ensureCanManageKnowledge(assistantId, tenantId, userId);
 
     const uploads = [] as Array<Promise<any>>;
 
     for (const file of files) {
-      uploads.push(this.processSingleFile({ assistantId, file, shouldExtractText, userId }));
+      uploads.push(this.processSingleFile({ assistantId, tenantId, file, shouldExtractText, userId }));
     }
 
     return Promise.all(uploads);
@@ -71,11 +73,13 @@ export class AssistantKnowledgeService {
 
   private async processSingleFile({
     assistantId,
+    tenantId,
     file,
     shouldExtractText,
     userId,
   }: {
     assistantId: string;
+    tenantId: string;
     file: Express.Multer.File;
     shouldExtractText: boolean;
     userId: string;
@@ -113,6 +117,7 @@ export class AssistantKnowledgeService {
 
       const record = await this.assistantKnowledgeQueryService.createKnowledgeRecord({
         assistantId,
+        tenantId,
         fileName: file.originalname,
         fileKey,
         fileSize: file.size,
@@ -136,10 +141,10 @@ export class AssistantKnowledgeService {
     }
   }
 
-  async deleteKnowledge(assistantId: string, knowledgeId: string, userId: string) {
-    await this.ensureCanManageKnowledge(assistantId, userId);
+  async deleteKnowledge(assistantId: string, tenantId: string, knowledgeId: string, userId: string) {
+    await this.ensureCanManageKnowledge(assistantId, tenantId, userId);
 
-    const record = await this.assistantKnowledgeQueryService.deleteKnowledgeRecord(assistantId, knowledgeId);
+    const record = await this.assistantKnowledgeQueryService.deleteKnowledgeRecord(assistantId, tenantId, knowledgeId);
 
     if (!record) {
       throw new NotFoundException('Knowledge item not found');

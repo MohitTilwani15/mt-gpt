@@ -9,6 +9,7 @@ import type { AssistantCapabilities } from '../schemas/assistant.schema';
 
 interface CreateAssistantParams {
   ownerId: string;
+  tenantId: string;
   name: string;
   description?: string | null;
   instructions?: string | null;
@@ -19,6 +20,7 @@ interface CreateAssistantParams {
 interface UpdateAssistantParams {
   assistantId: string;
   ownerId: string;
+  tenantId: string;
   name?: string;
   description?: string | null;
   instructions?: string | null;
@@ -35,13 +37,14 @@ export class AssistantQueryService {
   private readonly cacheTtlSeconds = 60;
 
   async createAssistant(params: CreateAssistantParams) {
-    const { ownerId, name, description, instructions, defaultModel, capabilities } = params;
+    const { ownerId, tenantId, name, description, instructions, defaultModel, capabilities } = params;
 
     const [assistant] = await this.db
       .insert(databaseSchema.assistant)
       .values({
         ownerId,
         name,
+        tenantId,
         description: description ?? null,
         instructions: instructions ?? null,
         defaultModel: defaultModel ?? null,
@@ -53,7 +56,7 @@ export class AssistantQueryService {
   }
 
   async updateAssistant(params: UpdateAssistantParams) {
-    const { assistantId, ownerId, ...updates } = params;
+    const { assistantId, ownerId, tenantId, ...updates } = params;
 
     const updatePayload: Record<string, unknown> = { updatedAt: new Date() };
 
@@ -66,27 +69,37 @@ export class AssistantQueryService {
     const [assistant] = await this.db
       .update(databaseSchema.assistant)
       .set(updatePayload)
-      .where(and(eq(databaseSchema.assistant.id, assistantId), eq(databaseSchema.assistant.ownerId, ownerId)))
+      .where(and(
+        eq(databaseSchema.assistant.id, assistantId),
+        eq(databaseSchema.assistant.ownerId, ownerId),
+        eq(databaseSchema.assistant.tenantId, tenantId),
+      ))
       .returning();
 
     return assistant ?? null;
   }
 
-  async deleteAssistant(assistantId: string, ownerId: string) {
+  async deleteAssistant(assistantId: string, ownerId: string, tenantId: string) {
     const [deleted] = await this.db
       .delete(databaseSchema.assistant)
-      .where(and(eq(databaseSchema.assistant.id, assistantId), eq(databaseSchema.assistant.ownerId, ownerId)))
+      .where(and(
+        eq(databaseSchema.assistant.id, assistantId),
+        eq(databaseSchema.assistant.ownerId, ownerId),
+        eq(databaseSchema.assistant.tenantId, tenantId),
+      ))
       .returning();
 
     return deleted ?? null;
   }
 
-  async getAssistantById(assistantId: string) {
+  async getAssistantById(assistantId: string, tenantId?: string) {
     const [assistant] = await applyDefaultCache(
       this.db
         .select()
         .from(databaseSchema.assistant)
-        .where(eq(databaseSchema.assistant.id, assistantId)),
+        .where(tenantId
+          ? and(eq(databaseSchema.assistant.id, assistantId), eq(databaseSchema.assistant.tenantId, tenantId))
+          : eq(databaseSchema.assistant.id, assistantId)),
       `assistant:${assistantId}:base`,
       this.cacheTtlSeconds,
     );
@@ -100,7 +113,10 @@ export class AssistantQueryService {
         this.db
           .select()
           .from(databaseSchema.assistantKnowledge)
-          .where(eq(databaseSchema.assistantKnowledge.assistantId, assistantId)),
+          .where(and(
+            eq(databaseSchema.assistantKnowledge.assistantId, assistantId),
+            eq(databaseSchema.assistantKnowledge.tenantId, assistant.tenantId),
+          )),
         `assistant:${assistantId}:knowledge`,
         this.cacheTtlSeconds,
       ),
@@ -108,7 +124,10 @@ export class AssistantQueryService {
         this.db
           .select()
           .from(databaseSchema.assistantShare)
-          .where(eq(databaseSchema.assistantShare.assistantId, assistantId)),
+          .where(and(
+            eq(databaseSchema.assistantShare.assistantId, assistantId),
+            eq(databaseSchema.assistantShare.tenantId, assistant.tenantId),
+          )),
         `assistant:${assistantId}:shares`,
         this.cacheTtlSeconds,
       ),
@@ -121,8 +140,8 @@ export class AssistantQueryService {
     };
   }
 
-  async getAssistantForUser(assistantId: string, userId: string) {
-    const assistant = await this.getAssistantById(assistantId);
+  async getAssistantForUser(assistantId: string, userId: string, tenantId: string) {
+    const assistant = await this.getAssistantById(assistantId, tenantId);
 
     if (!assistant) {
       return null;
@@ -139,23 +158,27 @@ export class AssistantQueryService {
         .where(
           and(
             eq(databaseSchema.assistantShare.assistantId, assistantId),
+            eq(databaseSchema.assistantShare.tenantId, tenantId),
             eq(databaseSchema.assistantShare.userId, userId),
           ),
         ),
-      `assistant:${assistantId}:share:${userId}`,
+      `assistant:${assistantId}:share:${userId}:tenant:${tenantId}`,
       this.cacheTtlSeconds,
     );
 
     return shareMatches.length > 0 ? assistant : null;
   }
 
-  async listAssistantsForUser(userId: string) {
+  async listAssistantsForUser(userId: string, tenantId: string) {
     const owned = await applyDefaultCache(
       this.db
         .select()
         .from(databaseSchema.assistant)
-        .where(eq(databaseSchema.assistant.ownerId, userId)),
-      `user:${userId}:assistants:owned`,
+        .where(and(
+          eq(databaseSchema.assistant.ownerId, userId),
+          eq(databaseSchema.assistant.tenantId, tenantId),
+        )),
+      `user:${userId}:tenant:${tenantId}:assistants:owned`,
       this.cacheTtlSeconds,
     );
 
@@ -167,8 +190,11 @@ export class AssistantQueryService {
           databaseSchema.assistant,
           eq(databaseSchema.assistantShare.assistantId, databaseSchema.assistant.id),
         )
-        .where(eq(databaseSchema.assistantShare.userId, userId)),
-      `user:${userId}:assistants:shared`,
+        .where(and(
+          eq(databaseSchema.assistantShare.userId, userId),
+          eq(databaseSchema.assistantShare.tenantId, tenantId),
+        )),
+      `user:${userId}:tenant:${tenantId}:assistants:shared`,
       this.cacheTtlSeconds,
     );
 
@@ -186,16 +212,17 @@ export class AssistantQueryService {
     return results;
   }
 
-  async upsertShare(params: { assistantId: string; userId: string; canManage?: boolean }) {
-    const { assistantId, userId, canManage = false } = params;
+  async upsertShare(params: { assistantId: string; tenantId: string; userId: string; canManage?: boolean }) {
+    const { assistantId, tenantId, userId, canManage = false } = params;
 
     const [share] = await this.db
       .insert(databaseSchema.assistantShare)
-      .values({
-        assistantId,
-        userId,
-        canManage,
-      })
+        .values({
+          assistantId,
+          tenantId,
+          userId,
+          canManage,
+        })
       .onConflictDoUpdate({
         target: [databaseSchema.assistantShare.assistantId, databaseSchema.assistantShare.userId],
         set: {
@@ -207,14 +234,15 @@ export class AssistantQueryService {
     return share;
   }
 
-  async removeShare(params: { assistantId: string; userId: string }) {
-    const { assistantId, userId } = params;
+  async removeShare(params: { assistantId: string; tenantId: string; userId: string }) {
+    const { assistantId, tenantId, userId } = params;
 
     const [removed] = await this.db
       .delete(databaseSchema.assistantShare)
       .where(
         and(
           eq(databaseSchema.assistantShare.assistantId, assistantId),
+          eq(databaseSchema.assistantShare.tenantId, tenantId),
           eq(databaseSchema.assistantShare.userId, userId),
         ),
       )
@@ -223,7 +251,7 @@ export class AssistantQueryService {
     return removed ?? null;
   }
 
-  async listShares(assistantId: string) {
+  async listShares(assistantId: string, tenantId: string) {
     const shares = await applyDefaultCache(
       this.db
         .select({
@@ -235,7 +263,10 @@ export class AssistantQueryService {
           databaseSchema.user,
           eq(databaseSchema.user.id, databaseSchema.assistantShare.userId),
         )
-        .where(eq(databaseSchema.assistantShare.assistantId, assistantId)),
+        .where(and(
+          eq(databaseSchema.assistantShare.assistantId, assistantId),
+          eq(databaseSchema.assistantShare.tenantId, tenantId),
+        )),
       `assistant:${assistantId}:shares:with-user`,
       this.cacheTtlSeconds,
     );

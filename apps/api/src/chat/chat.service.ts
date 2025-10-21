@@ -19,12 +19,14 @@ import { ChatResponse } from './interfaces/chat.interface';
 import { DATABASE_CONNECTION } from 'src/database/database-connection';
 import { databaseSchema } from 'src/database/schemas';
 import { mapDBPartToUIMessagePart } from '../lib/message-mapping';
+import type { MyDBUIMessagePartSelect } from 'src/database/schemas/conversation.schema';
 import { Mem0MemoryService } from './services/mem0-memory.service';
 import { AssistantQueryService } from 'src/database/queries/assistant.query';
 import { AssistantKnowledgeQueryService } from 'src/database/queries/assistant-knowledge.query';
 import type { AssistantCapabilities } from 'src/database/schemas/assistant.schema';
 import { TextProcessingService } from './services/text-processing.service';
 import { AIResponseService } from './services/ai-response.service';
+import type { TenantContext } from 'src/tenant/tenant.service';
 
 type ChatSearchMatchType = 'message' | 'title';
 
@@ -55,7 +57,12 @@ export class ChatService {
     private readonly aiResponseService: AIResponseService,
   ) {}
 
-  async createChat(requestBody: PostChatRequestDto, session: UserSession, abortSignal?: AbortSignal) {
+  async createChat(
+    requestBody: PostChatRequestDto,
+    session: UserSession,
+    tenant: TenantContext,
+    abortSignal?: AbortSignal,
+  ) {
     const { id, message, enableReasoning, selectedChatModel } = requestBody;
 
     let effectiveModel = selectedChatModel ?? ChatModel.GPT_4O;
@@ -67,7 +74,7 @@ export class ChatService {
       name?: string;
     } | undefined;
 
-    const existingChat = await this.chatQueryService.getChatById({ id });
+    const existingChat = await this.chatQueryService.getChatById({ id, tenantId: tenant.tenantId });
     if (existingChat && existingChat.userId !== session.user.id) {
       throw new ChatSDKError('forbidden:chat');
     }
@@ -76,6 +83,7 @@ export class ChatService {
       const assistant = await this.assistantQueryService.getAssistantForUser(
         requestBody.assistantId,
         session.user.id,
+        tenant.tenantId,
       );
 
       if (!assistant) {
@@ -97,15 +105,17 @@ export class ChatService {
         await this.chatQueryService.assignAssistantToChat({
           chatId: existingChat.id,
           assistantId: assistant.id,
+          tenantId: tenant.tenantId,
         });
       } else if (!existingChat) {
         await this.chatQueryService.assignAssistantToChat({
           chatId: id,
           assistantId: assistant.id,
+          tenantId: tenant.tenantId,
         }).catch(() => undefined);
       }
 
-      const knowledgeRecords = await this.assistantKnowledgeQueryService.listKnowledge(assistant.id);
+      const knowledgeRecords = await this.assistantKnowledgeQueryService.listKnowledge(assistant.id, tenant.tenantId);
       const knowledgeSnippet = this.textProcessingService.formatKnowledgeSnippets(knowledgeRecords);
 
       assistantContext = {
@@ -150,7 +160,7 @@ export class ChatService {
       const messages = dbMessages.reverse().map((message) => ({
         id: message.id,
         role: message.role,
-        parts: message.parts.map((part) => mapDBPartToUIMessagePart(part)),
+        parts: message.parts.map((part) => mapDBPartToUIMessagePart(part as MyDBUIMessagePartSelect)),
       }));
 
       let responseStream: any;
@@ -186,6 +196,7 @@ export class ChatService {
                     userId: session.user.id,
                     chatId: id,
                     messageId: message.id,
+                    tenantId: tenant.tenantId,
                     messages: [
                       { role: 'user', content: userTextFull },
                       { role: 'assistant', content: aiResponseText },
@@ -220,6 +231,7 @@ export class ChatService {
                 await this.chatQueryService.updateChatLastContextById({
                   chatId: id,
                   context: usage,
+                  tenantId: tenant.tenantId,
                 });
               } catch (err) {
                 console.warn('Unable to persist last usage for chat', id, err);
@@ -233,7 +245,7 @@ export class ChatService {
     });
 
     if (shouldGenerateTitle) {
-      void this.generateChatTitleInBackground({ chatId: id, userQueryText });
+      void this.generateChatTitleInBackground({ chatId: id, userQueryText, tenantId: tenant.tenantId });
     }
 
     return stream;
@@ -241,20 +253,28 @@ export class ChatService {
 
   async getChats(
     userId: string,
+    tenant: TenantContext,
     query: { limit: number; startingAfter?: string; endingBefore?: string },
   ): Promise<ChatResponse> {
-    return this.chatQueryService.getChatsByUserId({
-      id: userId,
+    return this.chatQueryService.getChatsForTenant({
+      userId,
+      tenantId: tenant.tenantId,
       limit: query.limit,
       startingAfter: query.startingAfter || null,
       endingBefore: query.endingBefore || null,
     });
   }
 
-  async createNewChat(chatId: string, session: UserSession, assistantId?: string) {
+  async createNewChat(
+    chatId: string,
+    session: UserSession,
+    tenant: TenantContext,
+    assistantId?: string,
+  ) {
     const chat = await this.chatQueryService.createChat({
       id: chatId,
       userId: session.user.id,
+      tenantId: tenant.tenantId,
       title: 'New Chat',
       assistantId: assistantId ?? undefined,
     });
@@ -268,8 +288,8 @@ export class ChatService {
     };
   }
 
-  async getChatById(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
+  async getChatById(chatId: string, session: UserSession, tenant: TenantContext) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId, tenantId: tenant.tenantId });
 
     if (!chat) {
       throw new ChatSDKError('not_found:chat');
@@ -282,8 +302,8 @@ export class ChatService {
     return chat;
   }
 
-  async forkChat(chatId: string, messageId: string, session: UserSession) {
-    const existingChat = await this.chatQueryService.getChatById({ id: chatId });
+  async forkChat(chatId: string, messageId: string, session: UserSession, tenant: TenantContext) {
+    const existingChat = await this.chatQueryService.getChatById({ id: chatId, tenantId: tenant.tenantId });
 
     if (!existingChat) {
       throw new ChatSDKError('not_found:chat');
@@ -317,6 +337,7 @@ export class ChatService {
     const forkedChat = await this.chatQueryService.createChat({
       id: newChatId,
       userId: session.user.id,
+      tenantId: tenant.tenantId,
       title: forkTitle,
     });
 
@@ -338,8 +359,8 @@ export class ChatService {
     return forkedChat;
   }
 
-  async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }): Promise<ChatSearchResult[]> {
-    const { userId, term, limit = 10 } = params;
+  async searchChatsByMessageTerm(params: { userId: string; tenantId: string; term: string; limit?: number }): Promise<ChatSearchResult[]> {
+    const { userId, tenantId, term, limit = 10 } = params;
 
     const normalizeSnippet = (value?: string | null) => {
       if (!value) {
@@ -352,8 +373,8 @@ export class ChatService {
     const expandedLimit = Math.max(limit, 10);
 
     const [messageMatches, titleMatches] = await Promise.all([
-      this.messageQueryService.searchChatsByMessageTerm({ userId, term, limit: expandedLimit }),
-      this.chatQueryService.searchChatsByTitle({ userId, term, limit: expandedLimit }),
+      this.messageQueryService.searchChatsByMessageTerm({ userId, tenantId, term, limit: expandedLimit }),
+      this.chatQueryService.searchChatsByTitle({ userId, tenantId, term, limit: expandedLimit }),
     ]);
 
     const resultsMap = new Map<string, ChatSearchResult>();
@@ -392,8 +413,8 @@ export class ChatService {
     return ordered.slice(0, limit);
   }
 
-  async deleteChatById(chatId: string, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
+  async deleteChatById(chatId: string, session: UserSession, tenant: TenantContext) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId, tenantId: tenant.tenantId });
 
     if (!chat) {
       throw new ChatSDKError('not_found:chat');
@@ -403,12 +424,12 @@ export class ChatService {
       throw new ChatSDKError('forbidden:chat');
     }
 
-    await this.chatQueryService.deleteChatById(chatId);
+    await this.chatQueryService.deleteChatById(chatId, tenant.tenantId);
     return { id: chatId, deleted: true };
   }
 
-  async updateChatVisibilityById(chatId: string, isPublic: boolean, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
+  async updateChatVisibilityById(chatId: string, isPublic: boolean, session: UserSession, tenant: TenantContext) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId, tenantId: tenant.tenantId });
 
     if (!chat) {
       throw new ChatSDKError('not_found:chat');
@@ -418,11 +439,11 @@ export class ChatService {
       throw new ChatSDKError('forbidden:chat');
     }
 
-    return await this.chatQueryService.updateChatVisibilityById({ id: chatId, isPublic });
+    return await this.chatQueryService.updateChatVisibilityById({ id: chatId, isPublic, tenantId: tenant.tenantId });
   }
 
-  async updateChatArchiveStateById(chatId: string, isArchived: boolean, session: UserSession) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
+  async updateChatArchiveStateById(chatId: string, isArchived: boolean, session: UserSession, tenant: TenantContext) {
+    const chat = await this.chatQueryService.getChatById({ id: chatId, tenantId: tenant.tenantId });
 
     if (!chat) {
       throw new ChatSDKError('not_found:chat');
@@ -432,15 +453,17 @@ export class ChatService {
       throw new ChatSDKError('forbidden:chat');
     }
 
-    return await this.chatQueryService.updateChatArchiveStateById({ id: chatId, isArchived });
+    return await this.chatQueryService.updateChatArchiveStateById({ id: chatId, isArchived, tenantId: tenant.tenantId });
   }
 
   private async generateChatTitleInBackground({
     chatId,
     userQueryText,
+    tenantId,
   }: {
     chatId: string;
     userQueryText: string;
+    tenantId: string;
   }) {
     try {
       const sanitized = this.textProcessingService.sanitizeText(userQueryText);
@@ -455,7 +478,7 @@ export class ChatService {
         return;
       }
 
-      await this.chatQueryService.updateChatTitleById({ id: chatId, title: trimmed });
+      await this.chatQueryService.updateChatTitleById({ id: chatId, title: trimmed, tenantId });
     } catch (error) {
       console.warn('Failed to generate chat title in background', chatId, error);
     }
@@ -464,20 +487,22 @@ export class ChatService {
   async updateVote(
     request: VoteMessageDto,
     session: UserSession,
+    tenant: TenantContext,
   ) {
-    return await this.voteQueryService.updateVote(request, session.user.id);
+    return await this.voteQueryService.updateVote(request, session.user.id, tenant.tenantId);
   }
 
-  async getVotes(chatId: string, session: UserSession) {
-    return await this.voteQueryService.getVotes(chatId, session.user.id);
+  async getVotes(chatId: string, session: UserSession, tenant: TenantContext) {
+    return await this.voteQueryService.getVotes(chatId, session.user.id, tenant.tenantId);
   }
 
   async getMessagesByChatId(
     chatId: string,
     query: GetMessagesQueryDto,
     session: UserSession,
+    tenant: TenantContext,
   ) {
-    const chat = await this.chatQueryService.getChatById({ id: chatId });
+    const chat = await this.chatQueryService.getChatById({ id: chatId, tenantId: tenant.tenantId });
 
     if (!chat) {
       throw new ChatSDKError('not_found:chat');
@@ -500,6 +525,7 @@ export class ChatService {
 
     return this.messageQueryService.getMessagesByChatIdPaginated({
       chatId,
+      tenantId: tenant.tenantId,
       limit,
       startingAfter: startingAfter || null,
       endingBefore: endingBefore || null,

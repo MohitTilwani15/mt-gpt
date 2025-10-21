@@ -5,6 +5,7 @@ import * as memorySchema from './memory.schema';
 import * as emailAssistantSchema from './email-assistant.schema';
 import * as contractTemplateSchema from './contract-template.schema';
 import * as contractPlaybookSchema from './contract-playbook.schema';
+import * as tenantSchema from './tenant.schema';
 
 export const databaseSchema = {
   ...authSchema,
@@ -14,4 +15,5 @@ export const databaseSchema = {
   ...emailAssistantSchema,
   ...contractTemplateSchema,
   ...contractPlaybookSchema,
+  ...tenantSchema,
 };

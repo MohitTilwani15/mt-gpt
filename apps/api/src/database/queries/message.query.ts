@@ -98,8 +98,8 @@ export class MessageQueryService {
     }
   }
 
-  async searchChatsByMessageTerm(params: { userId: string; term: string; limit?: number }) {
-    const { userId, term, limit = 10 } = params;
+  async searchChatsByMessageTerm(params: { userId: string; tenantId: string; term: string; limit?: number }) {
+    const { userId, tenantId, term, limit = 10 } = params;
 
     const likeValue = `%${term.toLowerCase()}%`;
 
@@ -118,6 +118,7 @@ export class MessageQueryService {
       .where(
         and(
           eq(chat.userId, userId),
+          eq(chat.tenantId, tenantId),
           eq(chat.isArchived, false),
           eq(databaseSchema.parts.type, 'text'),
           sql`LOWER(${databaseSchema.parts.text_text}) LIKE ${likeValue}`,
@@ -140,11 +141,13 @@ export class MessageQueryService {
 
   async getMessagesByChatIdPaginated({
     chatId,
+    tenantId: _tenantId,
     limit,
     startingAfter,
     endingBefore,
   }: {
     chatId: string;
+    tenantId: string;
     limit: number;
     startingAfter?: string | null;
     endingBefore?: string | null;

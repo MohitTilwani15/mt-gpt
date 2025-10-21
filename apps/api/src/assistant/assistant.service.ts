@@ -26,18 +26,18 @@ export class AssistantService {
     ) as AssistantCapabilities | undefined;
   }
 
-  async listAssistants(userId: string) {
-    return this.assistantQueryService.listAssistantsForUser(userId);
+  async listAssistants(userId: string, tenantId: string) {
+    return this.assistantQueryService.listAssistantsForUser(userId, tenantId);
   }
 
-  async getAssistant(userId: string, assistantId: string) {
-    const assistant = await this.assistantQueryService.getAssistantForUser(assistantId, userId);
+  async getAssistant(userId: string, tenantId: string, assistantId: string) {
+    const assistant = await this.assistantQueryService.getAssistantForUser(assistantId, userId, tenantId);
 
     if (!assistant) {
       throw new NotFoundException('Assistant not found');
     }
 
-    const knowledgeRecords = await this.assistantKnowledgeQueryService.listKnowledge(assistantId);
+    const knowledgeRecords = await this.assistantKnowledgeQueryService.listKnowledge(assistantId, tenantId);
 
     const knowledge = await Promise.all(
       knowledgeRecords.map(async (record) => ({
@@ -55,9 +55,10 @@ export class AssistantService {
     };
   }
 
-  async createAssistant(userId: string, dto: CreateAssistantDto) {
+  async createAssistant(userId: string, tenantId: string, dto: CreateAssistantDto) {
     const assistant = await this.assistantQueryService.createAssistant({
       ownerId: userId,
+      tenantId,
       name: dto.name,
       description: dto.description,
       instructions: dto.instructions,
@@ -68,10 +69,11 @@ export class AssistantService {
     return assistant;
   }
 
-  async updateAssistant(userId: string, assistantId: string, dto: UpdateAssistantDto) {
+  async updateAssistant(userId: string, tenantId: string, assistantId: string, dto: UpdateAssistantDto) {
     const updated = await this.assistantQueryService.updateAssistant({
       assistantId,
       ownerId: userId,
+      tenantId,
       name: dto.name,
       description: dto.description,
       instructions: dto.instructions,
@@ -86,8 +88,8 @@ export class AssistantService {
     return updated;
   }
 
-  async deleteAssistant(userId: string, assistantId: string) {
-    const deleted = await this.assistantQueryService.deleteAssistant(assistantId, userId);
+  async deleteAssistant(userId: string, tenantId: string, assistantId: string) {
+    const deleted = await this.assistantQueryService.deleteAssistant(assistantId, userId, tenantId);
 
     if (!deleted) {
       throw new NotFoundException('Assistant not found or you do not have permission to delete it');
@@ -96,8 +98,8 @@ export class AssistantService {
     return deleted;
   }
 
-  async shareAssistant(ownerId: string, assistantId: string, dto: ShareAssistantDto) {
-    const assistant = await this.assistantQueryService.getAssistantById(assistantId);
+  async shareAssistant(ownerId: string, tenantId: string, assistantId: string, dto: ShareAssistantDto) {
+    const assistant = await this.assistantQueryService.getAssistantById(assistantId, tenantId);
 
     if (!assistant) {
       throw new NotFoundException('Assistant not found');
@@ -119,6 +121,7 @@ export class AssistantService {
 
     const share = await this.assistantQueryService.upsertShare({
       assistantId,
+      tenantId,
       userId: user.id,
       canManage: dto.canManage ?? false,
     });
@@ -126,8 +129,8 @@ export class AssistantService {
     return share;
   }
 
-  async revokeShare(ownerId: string, assistantId: string, targetUserId: string) {
-    const assistant = await this.assistantQueryService.getAssistantById(assistantId);
+  async revokeShare(ownerId: string, tenantId: string, assistantId: string, targetUserId: string) {
+    const assistant = await this.assistantQueryService.getAssistantById(assistantId, tenantId);
 
     if (!assistant) {
       throw new NotFoundException('Assistant not found');
@@ -137,7 +140,7 @@ export class AssistantService {
       throw new ForbiddenException('Only the owner can revoke shares');
     }
 
-    const removed = await this.assistantQueryService.removeShare({ assistantId, userId: targetUserId });
+    const removed = await this.assistantQueryService.removeShare({ assistantId, tenantId, userId: targetUserId });
 
     if (!removed) {
       throw new NotFoundException('Share not found');
@@ -146,8 +149,8 @@ export class AssistantService {
     return removed;
   }
 
-  async listShares(userId: string, assistantId: string) {
-    const assistant = await this.assistantQueryService.getAssistantForUser(assistantId, userId);
+  async listShares(userId: string, tenantId: string, assistantId: string) {
+    const assistant = await this.assistantQueryService.getAssistantForUser(assistantId, userId, tenantId);
 
     if (!assistant) {
       throw new NotFoundException('Assistant not found');
@@ -157,6 +160,6 @@ export class AssistantService {
       throw new ForbiddenException('Only the owner can view sharing details');
     }
 
-    return this.assistantQueryService.listShares(assistantId);
+    return this.assistantQueryService.listShares(assistantId, tenantId);
   }
 }
