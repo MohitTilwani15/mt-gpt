@@ -231,6 +231,8 @@ async function queryLightRag(question, logger) {
 
     return data;
   } catch (error) {
+    logger.info("Request payload to LightRAG", JSON.stringify(error.response?.config?.data));
+    logger.info("LightRAG response data", JSON.stringify(error.response?.data));
     logger.error("LightRAG request failed", {
       error: error.message,
       status: error.response?.status,
