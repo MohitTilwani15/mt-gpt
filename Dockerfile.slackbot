@@ -1,0 +1,21 @@
+FROM node:lts-alpine AS base
+ENV NODE_ENV=production
+WORKDIR /usr/src/app
+RUN npm install -g pnpm
+
+FROM base AS deps
+WORKDIR /usr/src/app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY turbo.json ./
+COPY apps/slack-bot/package.json apps/slack-bot/package.json
+RUN pnpm install --filter slack-bot --prod --frozen-lockfile
+
+FROM base AS runner
+WORKDIR /usr/src/app
+ENV PORT=3000
+COPY apps/slack-bot ./apps/slack-bot
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY --from=deps /usr/src/app/apps/slack-bot/node_modules ./apps/slack-bot/node_modules
+EXPOSE 3000
+WORKDIR /usr/src/app/apps/slack-bot
+CMD ["pnpm", "start"]

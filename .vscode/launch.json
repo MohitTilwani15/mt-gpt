@@ -83,6 +83,22 @@
       ]
     },
     {
+      "name": "Debug Slack Bot",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/slack-bot/app.js",
+      "cwd": "${workspaceFolder}/apps/slack-bot",
+      "envFile": "${workspaceFolder}/apps/slack-bot/.env",
+      "runtimeArgs": ["--nolazy"],
+      "console": "integratedTerminal",
+      "restart": true,
+      "protocol": "inspector",
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ]
+    },
+    {
       "name": "Debug Document Redlining",
       "type": "coreclr",
       "request": "launch",
