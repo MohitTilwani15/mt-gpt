@@ -213,11 +213,15 @@ function formatLightRagResponse(data) {
   return [sanitizedResponse, referencesSection].filter(Boolean).join("\n\n");
 }
 
-async function queryLightRag(question, logger) {
+async function queryLightRag({ question, logger, conversationHistory }) {
   const payload = {
     ...LIGHT_RAG_SETTINGS,
     query: question,
   };
+
+  if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+    payload.conversation_history = conversationHistory;
+  }
 
   try {
     const { data } = await axios.post(`${LIGHT_RAG_BASE_URL}/query`, payload, {
@@ -241,7 +245,83 @@ async function queryLightRag(question, logger) {
   }
 }
 
-async function respondWithLightRag({ channel, thread_ts, question, client, logger, userId }) {
+async function buildConversationHistory({
+  client,
+  channel,
+  threadTs,
+  currentMessageTs,
+  botUserId,
+  logger,
+}) {
+  if (!threadTs) {
+    return [];
+  }
+
+  try {
+    const { messages } = await client.conversations.replies({
+      channel,
+      ts: threadTs,
+      limit: 100,
+    });
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return [];
+    }
+
+    const currentTsValue = currentMessageTs ? Number(currentMessageTs) : Number(threadTs);
+    const history = [];
+
+    for (const message of messages) {
+      if (!message?.ts) {
+        continue;
+      }
+
+      if (currentMessageTs && Number(message.ts) >= currentTsValue) {
+        continue;
+      }
+
+      if (message.subtype && message.subtype !== "bot_message") {
+        continue;
+      }
+
+      const rawText =
+        botUserId && typeof message.text === "string"
+          ? removeBotMention(message.text, botUserId)
+          : message.text;
+      const cleanedText = cleanQuestion(rawText);
+
+      if (!cleanedText) {
+        continue;
+      }
+
+      const role =
+        message.user === botUserId || message.bot_id || message.subtype === "bot_message"
+          ? "assistant"
+          : "user";
+
+      history.push({
+        role,
+        content: cleanedText,
+      });
+    }
+
+    return history;
+  } catch (error) {
+    logger.warn("Failed to build conversation history for LightRAG", { error: error.message });
+    return [];
+  }
+}
+
+async function respondWithLightRag({
+  channel,
+  thread_ts,
+  message_ts,
+  question,
+  client,
+  logger,
+  userId,
+  botUserId,
+}) {
   const targetThreadTs = thread_ts;
   const cleanedQuestion = cleanQuestion(question);
 
@@ -255,7 +335,20 @@ async function respondWithLightRag({ channel, thread_ts, question, client, logge
   }
 
   try {
-    const response = await queryLightRag(cleanedQuestion, logger);
+    const conversationHistory = await buildConversationHistory({
+      client,
+      channel,
+      threadTs: targetThreadTs,
+      currentMessageTs: message_ts,
+      botUserId,
+      logger,
+    });
+
+    const response = await queryLightRag({
+      question: cleanedQuestion,
+      logger,
+      conversationHistory,
+    });
     const formattedAnswer = formatLightRagResponse(response);
     const blocks = buildMarkdownBlocks(formattedAnswer);
 
@@ -294,10 +387,12 @@ app.message(async ({ message, client, logger, context }) => {
   await respondWithLightRag({
     channel: message.channel,
     thread_ts: threadTs,
+    message_ts: message.ts,
     question: message.text,
     client,
     logger,
     userId: message.user,
+    botUserId: context.botUserId,
   });
 });
 
@@ -311,10 +406,12 @@ app.event("app_mention", async ({ event, client, logger, context }) => {
   await respondWithLightRag({
     channel: event.channel,
     thread_ts: event.thread_ts || event.ts,
+    message_ts: event.ts,
     question: withoutMention,
     client,
     logger,
     userId: event.user,
+    botUserId: context.botUserId,
   });
 });
 
