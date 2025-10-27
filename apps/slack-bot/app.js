@@ -65,6 +65,8 @@ const LIGHT_RAG_SETTINGS = {
   stream: false,
 };
 
+const LIGHT_RAG_HISTORY_LIMIT = 4;
+
 const appOptions = {
   token: process.env.SLACK_BOT_TOKEN,
 };
@@ -305,7 +307,9 @@ async function buildConversationHistory({
       });
     }
 
-    return history;
+    return history.length <= LIGHT_RAG_HISTORY_LIMIT
+      ? history
+      : history.slice(history.length - LIGHT_RAG_HISTORY_LIMIT);
   } catch (error) {
     logger.warn("Failed to build conversation history for LightRAG", { error: error.message });
     return [];
