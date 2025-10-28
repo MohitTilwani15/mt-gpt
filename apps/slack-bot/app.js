@@ -388,7 +388,6 @@ async function respondWithLightRag({
     ) {
       logger.info("Identified potential relevant files", {
         relevantFiles: relevanceInfo.relevantFiles,
-        explicitMatches: relevanceInfo.explicitMatches,
       });
     }
 

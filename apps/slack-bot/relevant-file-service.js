@@ -51,6 +51,17 @@ function buildVariantSet(normalizedValue) {
   return variants;
 }
 
+function formatQuerySnippet(text) {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
+  const condensed = text.replace(/\s+/g, " ").trim();
+  if (!condensed) {
+    return "";
+  }
+  return condensed.length <= 200 ? condensed : `${condensed.slice(0, 200)}…`;
+}
+
 function buildRecord(name) {
   const normalized = normalizeForComparison(name);
   if (!normalized) {
@@ -124,8 +135,6 @@ class RelevantFileService {
     if (!question || !question.trim()) {
       return {
         relevantFiles: [],
-        explicitMatches: [],
-        allowReference: null,
         metadata: { usedAI: false, fileListAvailable: false },
       };
     }
@@ -136,10 +145,14 @@ class RelevantFileService {
     try {
       const fileRecords = await this.ensureFileRecords({ logger, now });
       if (!fileRecords.length) {
+        if (logger && typeof logger.info === "function") {
+          logger.info("No filenames available for relevance selection", {
+            querySnippet: formatQuerySnippet(question),
+            totalFilesConsidered: 0,
+          });
+        }
         return {
           relevantFiles: [],
-          explicitMatches: [],
-          allowReference: null,
           metadata: { usedAI: false, fileListAvailable: false },
         };
       }
@@ -156,23 +169,20 @@ class RelevantFileService {
         explicitMatches,
         logger,
       });
+      const combinedRecords = this.mergeRelevantRecords(relevantRecords, explicitMatches);
 
-      const relevantSet = new Set(relevantRecords.map((record) => record.normalized));
-      const explicitRelevantRecords = explicitMatches.filter((record) =>
-        relevantSet.has(record.normalized)
-      );
-      const finalExplicitRecords =
-        explicitRelevantRecords.length > 0 ? explicitRelevantRecords : explicitMatches;
-
-      const allowReference =
-        finalExplicitRecords.length > 0
-          ? this.buildReferenceMatcher(finalExplicitRecords)
-          : null;
+      if (logger && typeof logger.info === "function") {
+        logger.info("Relevant file selection summary", {
+          querySnippet: formatQuerySnippet(question),
+          totalFilesConsidered: fileRecords.length,
+          explicitMatchCount: explicitMatches.length,
+          aiSelectedCount: relevantRecords.length,
+          combinedCount: combinedRecords.length,
+        });
+      }
 
       return {
-        relevantFiles: relevantRecords.map((record) => record.original),
-        explicitMatches: finalExplicitRecords.map((record) => record.original),
-        allowReference,
+        relevantFiles: combinedRecords.map((record) => record.original),
         metadata: {
           usedAI: Boolean(this.openAiApiKey),
           fileListAvailable: true,
@@ -182,10 +192,13 @@ class RelevantFileService {
       if (logger && typeof logger.warn === "function") {
         logger.warn("Failed to determine relevant files", { error: error.message });
       }
+      if (logger && typeof logger.info === "function") {
+        logger.info("Relevant file selection failed", {
+          querySnippet: formatQuerySnippet(question),
+        });
+      }
       return {
         relevantFiles: [],
-        explicitMatches: [],
-        allowReference: null,
         metadata: { usedAI: Boolean(this.openAiApiKey), fileListAvailable: false },
       };
     }
@@ -351,41 +364,26 @@ Instructions:
     }
   }
 
-  buildReferenceMatcher(explicitRecords) {
-    if (!explicitRecords || explicitRecords.length === 0) {
-      return null;
-    }
+  mergeRelevantRecords(primaryRecords, explicitMatches) {
+    const orderedRecords = [];
+    const seen = new Set();
 
-    const allowedVariants = new Set();
-    for (const record of explicitRecords) {
-      for (const variant of record.variants) {
-        allowedVariants.add(variant);
+    const pushRecord = (record) => {
+      if (record && !seen.has(record.normalized)) {
+        seen.add(record.normalized);
+        orderedRecords.push(record);
       }
-    }
-
-    return (candidate) => {
-      if (!candidate || !allowedVariants.size) {
-        return false;
-      }
-
-      const normalizedCandidate = normalizeForComparison(candidate);
-      if (!normalizedCandidate) {
-        return false;
-      }
-
-      if (allowedVariants.has(normalizedCandidate)) {
-        return true;
-      }
-
-      const candidateVariants = buildVariantSet(normalizedCandidate);
-      for (const variant of candidateVariants) {
-        if (allowedVariants.has(variant)) {
-          return true;
-        }
-      }
-
-      return false;
     };
+
+    for (const record of primaryRecords || []) {
+      pushRecord(record);
+    }
+
+    for (const record of explicitMatches || []) {
+      pushRecord(record);
+    }
+
+    return orderedRecords;
   }
 }
 
