@@ -395,20 +395,14 @@ async function respondWithLightRag({
     if (
       relevanceInfo?.metadata?.fileListAvailable &&
       logger &&
-      typeof logger.debug === "function"
+      typeof logger.info === "function"
     ) {
-      logger.debug("Identified potential relevant files", {
+      logger.info("Identified potential relevant files", {
         relevantFiles: relevanceInfo.relevantFiles,
         explicitMatches: relevanceInfo.explicitMatches,
       });
     }
 
-    const explicitMatchesForFilters =
-      relevanceInfo?.metadata?.fileListAvailable && Array.isArray(relevanceInfo?.explicitMatches)
-        ? relevanceInfo.explicitMatches.filter(
-            (value) => typeof value === "string" && value.trim().length > 0
-          )
-        : [];
     const relevantFilesForFilters =
       relevanceInfo?.metadata?.fileListAvailable && Array.isArray(relevanceInfo?.relevantFiles)
         ? relevanceInfo.relevantFiles.filter(
@@ -417,6 +411,15 @@ async function respondWithLightRag({
         : [];
 
     const filtersList = relevantFilesForFilters.length ? relevantFilesForFilters : undefined;
+
+    if (logger && typeof logger.info === "function") {
+      logger.info("Dispatching question to LightRAG", {
+        channel,
+        thread_ts: targetThreadTs,
+        userId,
+        filterCount: Array.isArray(filtersList) ? filtersList.length : 0,
+      });
+    }
 
     const response = await queryLightRag({
       question: cleanedQuestion,

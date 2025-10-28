@@ -227,8 +227,8 @@ class RelevantFileService {
 
   async loadFileRecords(logger) {
     if (!this.databaseUrl) {
-      if (logger && typeof logger.debug === "function") {
-        logger.debug("DATABASE_URL not configured; skipping filename retrieval.");
+      if (logger && typeof logger.info === "function") {
+        logger.info("DATABASE_URL not configured; skipping filename retrieval.");
       }
       return [];
     }
