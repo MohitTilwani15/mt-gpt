@@ -238,17 +238,6 @@ function formatLightRagResponse(data) {
   return [sanitizedResponse, referencesSection].filter(Boolean).join("\n\n");
 }
 
-function filterReferencesByMatcher(references, matcher) {
-  if (!Array.isArray(references) || typeof matcher !== "function") {
-    return [];
-  }
-
-  return references.filter((ref) => {
-    const candidates = [ref?.file_path, ref?.title, ref?.reference_id];
-    return candidates.some((value) => matcher(value));
-  });
-}
-
 async function queryLightRag({ question, logger, conversationHistory, filePathFilters }) {
   const payload = {
     ...LIGHT_RAG_SETTINGS,
@@ -427,22 +416,7 @@ async function respondWithLightRag({
       conversationHistory,
       filePathFilters: filtersList,
     });
-    let filteredReferences = Array.isArray(response?.references) ? response.references : [];
-
-    if (relevanceInfo?.metadata?.fileListAvailable) {
-      if (relevanceInfo.allowReference) {
-        filteredReferences = filterReferencesByMatcher(filteredReferences, relevanceInfo.allowReference);
-      } else {
-        filteredReferences = [];
-      }
-    }
-
-    const responseForFormatting =
-      filteredReferences === response.references
-        ? response
-        : { ...response, references: filteredReferences };
-
-    const formattedAnswer = formatLightRagResponse(responseForFormatting);
+    const formattedAnswer = formatLightRagResponse(response);
     const blocks = buildMarkdownBlocks(formattedAnswer);
 
     await client.chat.postMessage({
