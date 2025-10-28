@@ -245,15 +245,27 @@ importers:
 
   apps/slack-bot:
     dependencies:
+      '@ai-sdk/openai':
+        specifier: ^2.0.28
+        version: 2.0.28(zod@4.1.8)
       '@slack/bolt':
         specifier: ^4.5.0
         version: 4.5.0(@types/express@5.0.3)
+      ai:
+        specifier: ^5.0.40
+        version: 5.0.40(zod@4.1.8)
       axios:
         specifier: ^1.7.7
         version: 1.12.0(debug@4.4.1)
       dotenv:
         specifier: ^16.4.5
         version: 16.4.7
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
+      zod:
+        specifier: ^4.1.8
+        version: 4.1.8
 
   apps/web:
     dependencies:

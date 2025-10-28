@@ -10,6 +10,7 @@ try {
 
 const { App, ExpressReceiver } = require("@slack/bolt");
 const axios = require("axios");
+const { RelevantFileService } = require("./relevant-file-service");
 
 const SLACK_SOCKET_MODE =
   (process.env.SLACK_SOCKET_MODE || "").toLowerCase() === "true";
@@ -66,6 +67,28 @@ const LIGHT_RAG_SETTINGS = {
 };
 
 const LIGHT_RAG_HISTORY_LIMIT = 4;
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const RELEVANT_FILE_CANDIDATE_LIMIT = parsePositiveInteger(
+  process.env.SLACK_BOT_FILE_CANDIDATE_LIMIT,
+  500
+);
+const RELEVANT_FILE_RESULT_LIMIT = parsePositiveInteger(
+  process.env.SLACK_BOT_FILE_RESULT_LIMIT,
+  5
+);
+
+const relevantFileService = new RelevantFileService({
+  databaseUrl: process.env.DATABASE_URL,
+  aiModel: process.env.SLACK_BOT_AI_MODEL || process.env.SLACK_BOT_RELEVANT_MODEL,
+  maxFiles: RELEVANT_FILE_CANDIDATE_LIMIT,
+  maxResults: RELEVANT_FILE_RESULT_LIMIT,
+  openAiApiKey: process.env.OPENAI_API_KEY,
+});
 
 const appOptions = {
   token: process.env.SLACK_BOT_TOKEN,
@@ -215,7 +238,18 @@ function formatLightRagResponse(data) {
   return [sanitizedResponse, referencesSection].filter(Boolean).join("\n\n");
 }
 
-async function queryLightRag({ question, logger, conversationHistory }) {
+function filterReferencesByMatcher(references, matcher) {
+  if (!Array.isArray(references) || typeof matcher !== "function") {
+    return [];
+  }
+
+  return references.filter((ref) => {
+    const candidates = [ref?.file_path, ref?.title, ref?.reference_id];
+    return candidates.some((value) => matcher(value));
+  });
+}
+
+async function queryLightRag({ question, logger, conversationHistory, filePathFilters }) {
   const payload = {
     ...LIGHT_RAG_SETTINGS,
     query: question,
@@ -223,6 +257,10 @@ async function queryLightRag({ question, logger, conversationHistory }) {
 
   if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
     payload.conversation_history = conversationHistory;
+  }
+
+  if (Array.isArray(filePathFilters) && filePathFilters.length > 0) {
+    payload.file_path_filters = filePathFilters;
   }
 
   try {
@@ -339,21 +377,69 @@ async function respondWithLightRag({
   }
 
   try {
-    const conversationHistory = await buildConversationHistory({
-      client,
-      channel,
-      threadTs: targetThreadTs,
-      currentMessageTs: message_ts,
-      botUserId,
-      logger,
-    });
+    const [conversationHistory, relevanceInfo] = await Promise.all([
+      buildConversationHistory({
+        client,
+        channel,
+        threadTs: targetThreadTs,
+        currentMessageTs: message_ts,
+        botUserId,
+        logger,
+      }),
+      relevantFileService.getRelevantFiles({
+        question: cleanedQuestion,
+        logger,
+      }),
+    ]);
+
+    if (
+      relevanceInfo?.metadata?.fileListAvailable &&
+      logger &&
+      typeof logger.debug === "function"
+    ) {
+      logger.debug("Identified potential relevant files", {
+        relevantFiles: relevanceInfo.relevantFiles,
+        explicitMatches: relevanceInfo.explicitMatches,
+      });
+    }
+
+    const explicitMatchesForFilters =
+      relevanceInfo?.metadata?.fileListAvailable && Array.isArray(relevanceInfo?.explicitMatches)
+        ? relevanceInfo.explicitMatches.filter(
+            (value) => typeof value === "string" && value.trim().length > 0
+          )
+        : [];
+    const relevantFilesForFilters =
+      relevanceInfo?.metadata?.fileListAvailable && Array.isArray(relevanceInfo?.relevantFiles)
+        ? relevanceInfo.relevantFiles.filter(
+            (value) => typeof value === "string" && value.trim().length > 0
+          )
+        : [];
+
+    const filtersList = relevantFilesForFilters.length ? relevantFilesForFilters : undefined;
 
     const response = await queryLightRag({
       question: cleanedQuestion,
       logger,
       conversationHistory,
+      filePathFilters: filtersList,
     });
-    const formattedAnswer = formatLightRagResponse(response);
+    let filteredReferences = Array.isArray(response?.references) ? response.references : [];
+
+    if (relevanceInfo?.metadata?.fileListAvailable) {
+      if (relevanceInfo.allowReference) {
+        filteredReferences = filterReferencesByMatcher(filteredReferences, relevanceInfo.allowReference);
+      } else {
+        filteredReferences = [];
+      }
+    }
+
+    const responseForFormatting =
+      filteredReferences === response.references
+        ? response
+        : { ...response, references: filteredReferences };
+
+    const formattedAnswer = formatLightRagResponse(responseForFormatting);
     const blocks = buildMarkdownBlocks(formattedAnswer);
 
     await client.chat.postMessage({
