@@ -140,12 +140,20 @@ const selectFilesWithAI = async ({ question, fileRecords, aiModel, maxResults, l
       cache: false,
     });
 
+    logger.info('object', object);
+
     const fileMap = new Map(fileRecords.map(f => [f.original, f]));
     const seen = new Set();
     
-    return (object?.files || [])
+    return (object?.files ?? [])
       .map(name => fileMap.get(name))
-      .filter(file => file && !seen.has(file.normalized) && !seen.add(file.normalized));
+      .filter(file => {
+        if (!file) return false;
+        const key = file.normalized;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
   } catch (error) {
     logger?.warn?.('AI selection failed', { error: error.message });
     return [];
