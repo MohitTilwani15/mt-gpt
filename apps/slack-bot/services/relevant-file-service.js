@@ -95,18 +95,29 @@ const buildAIPrompt = (question, fileNames, maxResults) => {
     ? `${question.slice(0, config.limits.maxQuestionLength)}…`
     : question;
 
-  return `You are a reasoning assistant that decides if the user's question requires any provided files.
+  return `You are a file selection assistant. Your task is to determine which files, if any, are needed to answer the user's question.
 
-User question: ${trimmed}
+USER QUESTION:
+${trimmed}
 
-Available files:
-- ${fileNames.join('\n- ')}
+AVAILABLE FILES:
+${fileNames.map(name => `- ${name}`).join('\n')}
 
-Instructions:
-- Only select files if the user explicitly refers to or implies using them (e.g., "open", "use", "show", "read", "from file", "in document", "check X file").
-- If the user is not asking to use any file, return an empty list [].
-- Select at most ${maxResults} files that best match the request.
-- Return only a JSON array of file names (e.g., ["contract.pdf"]) or [] — no explanations.`;
+SELECTION CRITERIA:
+1. Only select files when the user explicitly requests file content
+2. Do NOT select files for general questions that don't require file access
+3. Select the most relevant files based on:
+   - File name matching question keywords
+   - File type relevance (e.g., .pdf for documents, .csv for data)
+   - Context clues in the question
+4. Maximum files to select: ${maxResults}
+5. When multiple files match, prioritize exact name matches over partial matches
+
+OUTPUT FORMAT:
+Return ONLY a valid JSON array. No explanation, no markdown, no extra text.
+- If files are needed: ["file1.pdf", "file2.csv"]
+- If no files are needed: []
+`
 };
 
 const selectFilesWithAI = async ({ question, fileRecords, aiModel, maxResults, logger }) => {
@@ -118,7 +129,7 @@ const selectFilesWithAI = async ({ question, fileRecords, aiModel, maxResults, l
     const fileNames = fileRecords.map(f => f.original);
     const prompt = buildAIPrompt(question, fileNames, maxResults);
 
-    logger.info('Prompt Start');
+    logger.info('Prompt Start for model', aiModel);
     logger.info(prompt);
     logger.info('Prompt End');
 
@@ -126,6 +137,7 @@ const selectFilesWithAI = async ({ question, fileRecords, aiModel, maxResults, l
       model: openai(aiModel),
       schema,
       prompt,
+      cache: false,
     });
 
     const fileMap = new Map(fileRecords.map(f => [f.original, f]));
