@@ -1,14 +1,22 @@
 {
   "name": "slack-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI-enabled Slack bot powered by LightRAG",
+  "type": "module",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "check": "npx tsc --allowJs --noEmit app.js listeners/**/*.js services/**/*.js",
+    "lint": "npx @biomejs/biome check app.js listeners/ services/",
+    "lint:fix": "npx @biomejs/biome check --write app.js listeners/ services/"
   },
-  "keywords": [],
+  "keywords": [
+    "slack",
+    "bolt",
+    "light-rag"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@ai-sdk/openai": "^2.0.28",
     "@slack/bolt": "^4.5.0",
@@ -17,5 +25,10 @@
     "dotenv": "^16.4.5",
     "pg": "^8.16.3",
     "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.4",
+    "@types/node": "^24.6.1",
+    "typescript": "^5.9.3"
   }
 }
