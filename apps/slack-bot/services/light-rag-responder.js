@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { TextDecoder } from 'util';
 import { RelevantFileService } from './relevant-file-service.js';
 
 // ============================================================================
@@ -24,14 +25,17 @@ const config = {
     user_prompt: process.env.LIGHT_RAG_USER_PROMPT || '',
     enable_rerank: process.env.LIGHT_RAG_ENABLE_RERANK !== 'false',
     include_references: process.env.LIGHT_RAG_INCLUDE_REFERENCES !== 'false',
-    stream: false,
+    stream: true,
   },
   loadingMessages: [
     'Teaching the hamsters to type faster…',
     'Untangling the internet cables…',
     'Consulting the office goldfish…',
     'Polishing up the response just for you…',
+    'Issuing a subpoena to the spellchecker…',
+    'Asking ChatGPT’s cousin for advice…',
     'Convincing the AI to stop overthinking…',
+    'Considering settlement with common sense…',
   ],
 };
 
@@ -90,6 +94,57 @@ const buildMarkdownBlocks = (text) => {
 // LightRAG API
 // ============================================================================
 
+const parseLightRagStream = async ({ stream, logger }) => {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const responseParts = [];
+  let references;
+
+  const processLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    try {
+      const event = JSON.parse(trimmed);
+      if (Array.isArray(event.references)) {
+        references = event.references;
+      }
+      if (typeof event.response === 'string') {
+        responseParts.push(event.response);
+      }
+    } catch (error) {
+      logger?.debug?.('Failed to parse LightRAG stream line', {
+        line: trimmed,
+        error: error.message,
+      });
+    }
+  };
+
+  for await (const chunk of stream) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let newlineIndex = buffer.indexOf('\n');
+
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
+      buffer = buffer.slice(newlineIndex + 1);
+      processLine(line);
+      newlineIndex = buffer.indexOf('\n');
+    }
+  }
+
+  if (buffer.trim()) {
+    processLine(buffer);
+  }
+
+  const combined = responseParts.join('');
+  const cleaned = combined.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+  return {
+    response: cleaned || combined.trim(),
+    references,
+  };
+};
+
 const queryLightRag = async ({ question, conversationHistory, filePathFilters, logger }) => {
   const payload = {
     ...config.settings,
@@ -99,11 +154,12 @@ const queryLightRag = async ({ question, conversationHistory, filePathFilters, l
   };
 
   try {
-    const { data } = await axios.post(`${config.baseUrl}/query`, payload, {
+    const response = await axios.post(`${config.baseUrl}/query/stream`, payload, {
       timeout: config.timeout,
+      responseType: 'stream',
       ...(config.apiKey && { headers: { 'X-API-Key': config.apiKey } }),
     });
-    return data;
+    return await parseLightRagStream({ stream: response.data, logger });
   } catch (error) {
     logger?.info?.('LightRAG request payload', error.response?.config?.data);
     logger?.info?.('LightRAG response data', error.response?.data);
