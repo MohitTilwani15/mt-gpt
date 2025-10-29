@@ -304,13 +304,11 @@ export class RelevantFileService {
     };
   }
 
-  logSelectionSummary(logger, question, total, explicit, ai, combined) {
+  logSelectionSummary(logger, question, total, aiSelectedCount) {
     logger?.info?.('Relevant file selection summary', {
       querySnippet: formatQuerySnippet(question),
       totalFilesConsidered: total,
-      explicitMatchCount: explicit,
-      aiSelectedCount: ai,
-      combinedCount: combined,
+      aiSelectedCount,
     });
   }
 }
