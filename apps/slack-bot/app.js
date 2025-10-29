@@ -2,14 +2,6 @@ import 'dotenv/config';
 import { App, LogLevel } from '@slack/bolt';
 import { registerListeners } from './listeners/index.js';
 
-const ensureEnv = (name) => {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-};
-
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   appToken: process.env.SLACK_APP_TOKEN,
@@ -18,6 +10,16 @@ const app = new App({
   clientOptions: {
     slackApiUrl: process.env.SLACK_API_URL || 'https://slack.com/api',
   },
+  customRoutes: [
+    {
+      path: '/',
+      method: ['GET'],
+      handler: (req, res) => {
+        res.writeHead(200);
+        res.end(`Things are going just fine at ${req.headers.host}!`);
+      },
+    },
+  ],
 });
 
 registerListeners(app);
