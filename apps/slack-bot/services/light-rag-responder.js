@@ -86,18 +86,6 @@ const buildMarkdownBlocks = (text) => {
   }));
 };
 
-const formatReferences = (references) => {
-  if (!Array.isArray(references) || !references.length) return '';
-  
-  const lines = references.map((ref, i) => {
-    const id = ref.reference_id ? `[${ref.reference_id}] ` : '';
-    const source = ref.file_path || ref.title || 'Unknown source';
-    return `${i + 1}. ${id}${source}`;
-  });
-  
-  return `*References*\n${lines.join('\n')}`;
-};
-
 // ============================================================================
 // LightRAG API
 // ============================================================================
@@ -340,7 +328,8 @@ export const respondWithLightRag = async ({
       logger,
     });
 
-    const formattedAnswer = response?.response?.trim() || "I couldn't find a confident answer to that just yet.";
+    const finalAnswer =
+      response?.response?.trim() || "I couldn't find a confident answer to that just yet.";
 
     await sendMessage({
       client,
@@ -348,7 +337,7 @@ export const respondWithLightRag = async ({
       threadTs: targetThreadTs,
       userId,
       teamId,
-      text: formattedAnswer,
+      text: finalAnswer,
       extraBlocks,
       logger,
     });

@@ -68,13 +68,6 @@ const matchesQuestion = (file, question) => {
   return false;
 };
 
-const deduplicateFiles = (...fileLists) => {
-  const seen = new Set();
-  return fileLists
-    .flat()
-    .filter(file => file && !seen.has(file.normalized) && !seen.add(file.normalized));
-};
-
 // ============================================================================
 // AI Selection
 // ============================================================================
@@ -129,7 +122,7 @@ const selectFilesWithAI = async ({ question, fileRecords, aiModel, maxResults, l
       cache: false,
     });
 
-    logger.info('object', object);
+    logger.info('relevant files as per LLM request:', object);
 
     const fileMap = new Map(fileRecords.map(f => [f.original, f]));
     const seen = new Set();
