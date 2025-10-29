@@ -118,6 +118,10 @@ const selectFilesWithAI = async ({ question, fileRecords, aiModel, maxResults, l
     const fileNames = fileRecords.map(f => f.original);
     const prompt = buildAIPrompt(question, fileNames, maxResults);
 
+    logger.info('Prompt Start');
+    logger.info(prompt);
+    logger.info('Prompt End');
+
     const { object } = await generateObject({
       model: openai(aiModel),
       schema,
