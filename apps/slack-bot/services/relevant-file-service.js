@@ -68,17 +68,6 @@ const matchesQuestion = (file, question) => {
   return false;
 };
 
-const findMatches = (question, fileRecords) => {
-  const seen = new Set();
-  return fileRecords.filter(file => {
-    if (matchesQuestion(file, question) && !seen.has(file.normalized)) {
-      seen.add(file.normalized);
-      return true;
-    }
-    return false;
-  });
-};
-
 const deduplicateFiles = (...fileLists) => {
   const seen = new Set();
   return fileLists
@@ -222,14 +211,12 @@ export class RelevantFileService {
         return this.emptyResponse();
       }
 
-      const explicitMatches = findMatches(question, fileRecords);
-      const aiSelected = await this.selectWithAI(question, fileRecords, explicitMatches, logger);
-      const combined = deduplicateFiles(aiSelected, explicitMatches);
+      const aiSelected = await this.selectWithAI(question, fileRecords, logger);
 
-      this.logSelectionSummary(logger, question, fileRecords.length, explicitMatches.length, aiSelected.length, combined.length);
+      this.logSelectionSummary(logger, question, fileRecords.length, aiSelected.length);
 
       return {
-        relevantFiles: combined.map(f => f.original),
+        relevantFiles: aiSelected.map(f => f.original),
         metadata: {
           usedAI: Boolean(this.openAiApiKey),
           fileListAvailable: true,
@@ -296,8 +283,8 @@ export class RelevantFileService {
     });
   }
 
-  async selectWithAI(question, fileRecords, fallbackMatches, logger) {
-    if (!this.openAiApiKey) return fallbackMatches;
+  async selectWithAI(question, fileRecords, logger) {
+    if (!this.openAiApiKey) return [];
 
     const selected = await selectFilesWithAI({
       question,
@@ -307,7 +294,7 @@ export class RelevantFileService {
       logger,
     });
 
-    return selected.length ? selected : fallbackMatches;
+    return selected.length ? selected : [];
   }
 
   emptyResponse() {
