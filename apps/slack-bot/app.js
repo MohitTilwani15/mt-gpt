@@ -14,7 +14,7 @@ const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   appToken: process.env.SLACK_APP_TOKEN,
   socketMode: true,
-  logLevel: LogLevel.DEBUG,
+  logLevel: LogLevel.INFO,
   clientOptions: {
     slackApiUrl: process.env.SLACK_API_URL || 'https://slack.com/api',
   },
