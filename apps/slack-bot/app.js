@@ -20,6 +20,7 @@ const app = new App({
       },
     },
   ],
+  port: process.env.PORT || 3000,
 });
 
 registerListeners(app);

@@ -1,10 +1,18 @@
 import axios from 'axios';
 import { TextDecoder } from 'util';
+import { generateObject } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
 import { RelevantFileService } from './relevant-file-service.js';
 
 // ============================================================================
 // Configuration
 // ============================================================================
+
+const toPositiveInt = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
 
 const config = {
   baseUrl: (process.env.LIGHT_RAG_URL || 'http://127.0.0.1:9621').replace(/\/$/, ''),
@@ -26,6 +34,14 @@ const config = {
     enable_rerank: process.env.LIGHT_RAG_ENABLE_RERANK !== 'false',
     include_references: process.env.LIGHT_RAG_INCLUDE_REFERENCES !== 'false',
     stream: true,
+  },
+  queryEnhancement: {
+    enabled: process.env.SLACK_BOT_ENHANCE_QUERY !== 'false',
+    model: process.env.SLACK_BOT_ENHANCE_QUERY_MODEL || 'gpt-5-nano',
+    maxSummaryLength: toPositiveInt(process.env.SLACK_BOT_SUMMARY_MAX_CHARS, 500),
+    maxHistoryCharacters: toPositiveInt(process.env.SLACK_BOT_ENHANCE_HISTORY_CHAR_LIMIT, 2000),
+    maxMessageCharacters: toPositiveInt(process.env.SLACK_BOT_ENHANCE_MESSAGE_CHAR_LIMIT, 600),
+    maxEnhancedQuestionLength: toPositiveInt(process.env.SLACK_BOT_ENHANCED_QUERY_CHAR_LIMIT, 4000),
   },
   loadingMessages: [
     'Teaching the hamsters to type faster…',
@@ -77,6 +93,27 @@ const chunkText = (text, maxLength = config.maxChunkLength) => {
   return chunks;
 };
 
+const truncateText = (text, maxLength) => {
+  if (typeof text !== 'string') return '';
+  if (!maxLength || text.length <= maxLength) return text;
+  if (maxLength <= 3) return text.slice(0, maxLength);
+  const sliced = text.slice(0, maxLength - 3).trimEnd();
+  return `${sliced}...`;
+};
+
+const formatHistoryForEnhancement = (history) => {
+  if (!Array.isArray(history) || !history.length) return '';
+
+  const { maxHistoryCharacters, maxMessageCharacters } = config.queryEnhancement;
+  const segments = history.map(entry => {
+    const role = entry?.role === 'assistant' ? 'Assistant' : 'User';
+    const content = truncateText(entry?.content ?? '', maxMessageCharacters);
+    return `${role}: ${content}`;
+  });
+
+  return truncateText(segments.join('\n'), maxHistoryCharacters);
+};
+
 // ============================================================================
 // Slack Message Formatting
 // ============================================================================
@@ -88,6 +125,82 @@ const buildMarkdownBlocks = (text) => {
     type: 'section',
     text: { type: 'mrkdwn', text: chunk },
   }));
+};
+
+// ============================================================================
+// Query Enhancement
+// ============================================================================
+
+const enhanceQuestionWithLLM = async ({ question, conversationHistory, logger }) => {
+  const { enabled, model, maxSummaryLength, maxEnhancedQuestionLength } = config.queryEnhancement;
+
+  if (!enabled) {
+    return { summary: null, enhancedQuestion: null };
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    logger?.debug?.('Skipping query enhancement; OPENAI_API_KEY missing');
+    return { summary: null, enhancedQuestion: null };
+  }
+
+  if (!Array.isArray(conversationHistory) || !conversationHistory.length) {
+    return { summary: null, enhancedQuestion: null };
+  }
+
+  const historyText = formatHistoryForEnhancement(conversationHistory);
+  if (!historyText) {
+    return { summary: null, enhancedQuestion: null };
+  }
+
+  try {
+    const schema = z.object({
+      summary: z
+        .string()
+        .max(maxSummaryLength)
+        .optional(),
+      enhanced_question: z
+        .string()
+        .min(1)
+        .max(maxEnhancedQuestionLength),
+    });
+
+    const prompt = [
+      'You help prepare queries for a document-retrieval system.',
+      'Summarize the prior conversation to capture the user intent and key constraints.',
+      'Then rewrite the latest user question so it stands alone while preserving all factual details.',
+      'Do not invent new facts. If a detail is uncertain, omit it.',
+      '',
+      'Return JSON with fields:',
+      '- summary: concise conversation summary (use empty string if nothing relevant).',
+      '- enhanced_question: rewritten user question ready for retrieval.',
+      '',
+      'Conversation so far:',
+      historyText,
+      '',
+      'Latest user question:',
+      question,
+    ].join('\n');
+
+    const { object } = await generateObject({
+      model: openai(model),
+      schema,
+      prompt,
+    });
+
+    const summary = truncateText(object?.summary?.trim() || '', maxSummaryLength) || null;
+    const enhancedQuestion =
+      truncateText(object?.enhanced_question?.trim() || '', maxEnhancedQuestionLength) || null;
+
+    if (!enhancedQuestion) {
+      return { summary, enhancedQuestion: null };
+    }
+
+    logger?.debug?.('Enhanced query generated');
+    return { summary, enhancedQuestion };
+  } catch (error) {
+    logger?.warn?.('Query enhancement failed', { error: error.message });
+    return { summary: null, enhancedQuestion: null };
+  }
 };
 
 // ============================================================================
@@ -145,11 +258,10 @@ const parseLightRagStream = async ({ stream, logger }) => {
   };
 };
 
-const queryLightRag = async ({ question, conversationHistory, filePathFilters, logger }) => {
+const queryLightRag = async ({ question, filePathFilters, logger }) => {
   const payload = {
     ...config.settings,
     query: question,
-    ...(conversationHistory?.length && { conversation_history: conversationHistory }),
     ...(filePathFilters?.length && { file_path_filters: filePathFilters }),
   };
 
@@ -370,16 +482,35 @@ export const respondWithLightRag = async ({
       logger?.info?.('Using relevant files', { relevantFiles: filePathFilters });
     }
 
+    const { summary, enhancedQuestion } = await enhanceQuestionWithLLM({
+      question: cleanedQuestion,
+      conversationHistory,
+      logger,
+    });
+
+    const baseQuestion = enhancedQuestion || cleanedQuestion;
+    const questionWithSummary = summary
+      ? `${baseQuestion}\n\nConversation summary: ${summary}`
+      : baseQuestion;
+    const questionForLightRag = truncateText(
+      questionWithSummary,
+      config.queryEnhancement.maxEnhancedQuestionLength
+    );
+
+    if (summary) {
+      logger?.debug?.('Conversation summary prepared for LightRAG', { summary });
+    }
+
     logger?.info?.('Querying LightRAG', {
       channel,
       thread_ts: targetThreadTs,
       userId,
+      enhancedQuestionSnippet: enhancedQuestion ? truncateText(baseQuestion, 200) : undefined,
       filterCount: filePathFilters?.length || 0,
     });
 
     const response = await queryLightRag({
-      question: cleanedQuestion,
-      conversationHistory,
+      question: questionForLightRag,
       filePathFilters,
       logger,
     });
